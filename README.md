@@ -22,19 +22,10 @@ install cmake
 
 activate repo to install into
 
-mamba install gdal
-$env:GDAL_DIR = "$env:CONDA_PREFIX\Library"
-$env:GDAL_LIBRARY = "$env:CONDA_PREFIX\Library\lib\gdal.lib"
-$env:GDAL_INCLUDE_DIR = "$env:CONDA_PREFIX\Library\include"
-
 mamba install boost
 $env:BOOST_ROOT = "$env:CONDA_PREFIX\Library"
 $env:BOOST_INCLUDEDIR = "$env:CONDA_PREFIX\Library\include"
 $env:BOOST_LIBRARYDIR = "$env:CONDA_PREFIX\Library\lib"
-
-mamba install swig
-$env:SWIG_EXECUTABLE = "$env:CONDA_PREFIX\Library\bin\swig.exe"
-$env:SWIG_DIR = "$env:CONDA_PREFIX\Library\share\swig"
 
 mkdir build
 cd build

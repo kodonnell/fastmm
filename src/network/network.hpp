@@ -13,7 +13,6 @@
 #include "network/type.hpp"
 #include "core/gps.hpp"
 #include "mm/mm_type.hpp"
-#include <ogrsf_frmts.h> // C++ API for GDAL
 #include <iostream>
 #include <math.h> // Calulating probability
 #include <iomanip>
@@ -53,19 +52,12 @@ namespace FMM
           Item, boost::geometry::index::quadratic<16>>
           Rtree;
       /**
-       *  Constructor of Network
+       *  Default constructor of Network (creates empty network)
        *
-       *  @param filename: the path to a network file in ESRI shapefile format
-       *  @param id_name: the name of the id field
-       *  @param source_name: the name of the source field
-       *  @param target_name: the name of the target field
-       *  @param mode: mode name, only applies to OSM network
-       *
+       *  Creates an empty network that can be populated using add_edge.
+       *  After adding all edges, call build_rtree_index() to build the spatial index.
        */
-      Network(const std::string &filename,
-              const std::string &id_name = "id",
-              const std::string &source_name = "source",
-              const std::string &target_name = "target");
+      Network();
       /**
        * Get number of nodes in the network
        * @return number of nodes
@@ -182,14 +174,24 @@ namespace FMM
        * @return true if a.dist<b.dist
        */
       static bool candidate_compare(const MM::Candidate &a, const MM::Candidate &b);
+      /**
+       * Add an edge to the network
+       * @param edge_id the ID of the edge
+       * @param source the source node ID
+       * @param target the target node ID
+       * @param geom the geometry of the edge as a LineString
+       */
       void add_edge(EdgeID edge_id, NodeID source, NodeID target,
                     const FMM::CORE::LineString &geom);
+      /**
+       * Build rtree spatial index for the network
+       *
+       * This must be called after all edges have been added to the network
+       * and before performing any spatial queries.
+       */
+      void build_rtree_index();
 
     private:
-      void read_ogr_file(const std::string &filename,
-                         const std::string &id_name,
-                         const std::string &source_name,
-                         const std::string &target_name);
       /**
        * Concatenate a linestring segs to a linestring line, used in the
        * function complete_path_to_geometry
@@ -201,10 +203,6 @@ namespace FMM
       static void append_segs_to_line(FMM::CORE::LineString *line,
                                       const FMM::CORE::LineString &segs,
                                       int offset = 0);
-      /**
-       * Build rtree for the network
-       */
-      void build_rtree_index();
       int srid;                // Spatial reference id
       Rtree rtree;             // Network rtree structure
       std::vector<Edge> edges; // all edges in the network

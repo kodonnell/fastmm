@@ -13,7 +13,6 @@
 #include "mm/mm_type.hpp"
 
 // #include <boost/predef.h>
-#include <ogrsf_frmts.h> // C++ API for GDAL
 #include <cfloat>
 #include <iostream>
 #include <string>
