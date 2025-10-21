@@ -44,7 +44,7 @@ jobs:
 
           # Install Boost before building
           CIBW_BEFORE_BUILD_WINDOWS: >
-            mkdir -p C:/vcpkg/archives &&
+            if not exist "C:\vcpkg\archives" mkdir "C:\vcpkg\archives" &&
             vcpkg install boost-geometry:x64-windows boost-serialization:x64-windows boost-format:x64-windows &&
             pip install scikit-build-core setuptools-scm pybind11 delvewheel
           # Ensure vcpkg binary caching is enabled and uses a stable location
