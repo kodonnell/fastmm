@@ -64,7 +64,7 @@ jobs:
 
           # Repair Windows wheels to bundle DLL dependencies
           CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: >
-            delvewheel repair -w {dest_dir} {wheel} --add-path C:/vcpkg/installed/x64-windows/bin --ignore-in-wheel fastmmlib.dll
+            delvewheel repair -w {dest_dir} {wheel} --add-path C:/vcpkg/installed/x64-windows/bin --ignore-existing
 
           # Build verbosity
           CIBW_BUILD_VERBOSITY: 1
