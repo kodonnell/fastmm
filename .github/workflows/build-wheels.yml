@@ -27,6 +27,9 @@ jobs:
           # Build for Python 3.8-3.12 (skip 3.13-3.14 until widely supported)
           CIBW_BUILD: cp38-* cp39-* cp310-* cp311-* cp312-*
 
+          # Skip 32-bit builds, PyPy, and musllinux
+          CIBW_SKIP: pp* *-win32 *-musllinux_*
+
           # Install Boost before building
           CIBW_BEFORE_BUILD_WINDOWS: >
             vcpkg install boost-geometry:x64-windows boost-serialization:x64-windows &&
@@ -45,9 +48,6 @@ jobs:
 
           # Build verbosity
           CIBW_BUILD_VERBOSITY: 1
-
-          # Skip PyPy and musllinux for now
-          CIBW_SKIP: pp* *-musllinux_*
 
           # Test the wheel after building
           CIBW_TEST_COMMAND: python -c "import fmm; print('fmm version:', fmm.__version__)"
