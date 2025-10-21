@@ -33,10 +33,20 @@ jobs:
           python -m pip install --upgrade pip
           pip install build wheel setuptools setuptools-scm
 
+      - name: Cache vcpkg
+        uses: actions/cache@v3
+        with:
+          path: C:\vcpkg\installed
+          key: ${{ runner.os }}-vcpkg-boost-${{ matrix.python-version }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-boost-
+
       - name: Install Boost (Windows)
         if: runner.os == 'Windows'
         run: |
-          # Use vcpkg for Boost (faster and more reliable than choco)
+          # Install only what we need:
+          # - boost-geometry (header-only, for spatial indexing)
+          # - boost-serialization (compiled library, for UBODT serialization)
           vcpkg install boost-geometry:x64-windows boost-serialization:x64-windows
           echo "BOOST_ROOT=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows" >> $env:GITHUB_ENV
           echo "Boost_INCLUDE_DIR=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\include" >> $env:GITHUB_ENV
