@@ -96,3 +96,9 @@ sync.sh
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
 *.pyc
+
+
+cache
+*.whl
+dist
+wheelhouse/

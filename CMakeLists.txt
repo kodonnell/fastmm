@@ -117,6 +117,9 @@ add_library(FMMLIB SHARED
   $<TARGET_OBJECTS:UTIL>
   $<TARGET_OBJECTS:NETWORK>)
 
+# Set the output name to lowercase for consistency
+set_target_properties(FMMLIB PROPERTIES OUTPUT_NAME "fmmlib")
+
 
 message(STATUS "Installation folder ${CMAKE_INSTALL_PREFIX}")
 

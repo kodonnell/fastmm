@@ -18,11 +18,22 @@ if (-not $condaPrefix) {
     $condaPrefix = "C:/Users/ko/miniforge3/envs/pyfmm"
 }
 
+$scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+$condaBinPath = Join-Path $condaPrefix "Library\bin"
+$normalizedCondaBin = $condaBinPath -replace '\\','/'
+$buildReleaseDir = Join-Path (Join-Path $scriptRoot "build") "Release"
+$normalizedBuildReleaseDir = $buildReleaseDir -replace '\\','/'
+$addPathEntries = @($normalizedCondaBin, $normalizedBuildReleaseDir) | Where-Object { $_ -and $_.Trim() -ne "" }
+$addPathArgument = [string]::Join(';', $addPathEntries)
+
 # Install build dependencies
-$env:CIBW_BEFORE_BUILD_WINDOWS = "pip install scikit-build-core setuptools-scm pybind11"
+$env:CIBW_BEFORE_BUILD_WINDOWS = "pip install scikit-build-core setuptools-scm pybind11 delvewheel"
 
 # Set Boost paths for CMake to use conda's Boost
 $env:CIBW_ENVIRONMENT_WINDOWS = "BOOST_ROOT=$condaPrefix/Library"
+
+# Repair Windows wheels to bundle DLL dependencies
+$env:CIBW_REPAIR_WHEEL_COMMAND_WINDOWS = "delvewheel repair -w {dest_dir} {wheel} --add-path `"$addPathArgument`""
 
 # Build verbosity
 $env:CIBW_BUILD_VERBOSITY = "1"
