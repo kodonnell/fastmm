@@ -1,4 +1,4 @@
-cmake_minimum_required( VERSION 3.5.1)
+cmake_minimum_required( VERSION 3.15)
 
 message(STATUS "CMAKE version ${CMAKE_VERSION}")
 
@@ -125,32 +125,4 @@ message(STATUS "Installation folder ${CMAKE_INSTALL_PREFIX}")
 
 install(TARGETS FASTMMLIB LIBRARY DESTINATION lib)
 
-if(FASTMM_INSTALL_HEADER)
-  message(STATUS "Install fastmm headers")
-  set(FASTMM_DIST_INCLUDE_PATH
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/algorithm
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/core
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/mm
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/network
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/python
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/util
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fiboheap
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog)
-  install(
-      DIRECTORY
-      ${FASTMM_DIST_INCLUDE_PATH}
-      DESTINATION
-      "include/fastmm"
-      FILES_MATCHING
-      PATTERN "*.hpp"
-      PATTERN "*.h"
-  )
-else()
-  message(STATUS "Not install fastmm headers")
-endif()
-
-# message(STATUS "Add python cmake information")
-# add_subdirectory(python)
 add_subdirectory(python/pybind11)
-# add_subdirectory(test EXCLUDE_FROM_ALL)
-
