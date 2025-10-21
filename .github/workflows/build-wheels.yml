@@ -2,12 +2,11 @@ name: Build Wheels
 
 on:
   push:
-    branches: [ main, refactor ]
+    branches: [ main ]  # Only run on direct pushes to main (not PR branches)
     tags:
-      - 'v*'
-  pull_request:
-    branches: [ main, refactor ]
-  workflow_dispatch:
+      - 'v*'  # Run on version tags for releases
+  pull_request:  # Run on PRs to any branch
+  workflow_dispatch:  # Allow manual triggers
 
 jobs:
   build_wheels:
