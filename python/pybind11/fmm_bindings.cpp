@@ -1,4 +1,4 @@
-// pyfmm_bindings.cpp: pybind11 bindings for FMM
+// fmm_bindings.cpp: pybind11 bindings for FMM
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
@@ -10,7 +10,6 @@
 #include "mm/mm_type.hpp"
 #include "mm/fmm/fmm_algorithm.hpp"
 #include "mm/fmm/ubodt_gen_algorithm.hpp"
-#include "mm/stmatch/stmatch_algorithm.hpp"
 #include "mm/fmm/ubodt.hpp"
 
 namespace py = pybind11;

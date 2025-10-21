@@ -203,7 +203,6 @@ namespace FMM
       static void append_segs_to_line(FMM::CORE::LineString *line,
                                       const FMM::CORE::LineString &segs,
                                       int offset = 0);
-      int srid;                // Spatial reference id
       Rtree rtree;             // Network rtree structure
       std::vector<Edge> edges; // all edges in the network
       NodeIDVec node_id_vec;

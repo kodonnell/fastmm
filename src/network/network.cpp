@@ -30,7 +30,7 @@ bool Network::candidate_compare(const Candidate &a, const Candidate &b)
   }
 }
 
-Network::Network() : srid(4326), num_vertices(0)
+Network::Network() : num_vertices(0)
 {
   SPDLOG_INFO("Created empty network");
 }

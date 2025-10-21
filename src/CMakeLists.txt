@@ -101,7 +101,6 @@ file(GLOB NetworkGlob src/network/*.cpp)
 file(GLOB UtilGlob src/util/*.cpp)
 file(GLOB MMGlob src/mm/*.cpp)
 file(GLOB FMMGlob src/mm/fmm/*.cpp)
-file(GLOB STMATCHGlob src/mm/stmatch/*.cpp)
 
 add_library(CORE OBJECT ${CoreGlob})
 add_library(ALGORITHM OBJECT ${AlgorithmGlob})
@@ -109,12 +108,10 @@ add_library(UTIL OBJECT ${UtilGlob})
 add_library(NETWORK OBJECT ${NetworkGlob})
 add_library(MM_OBJ OBJECT ${MMGlob})
 add_library(FMM_OBJ OBJECT ${FMMGlob})
-add_library(STMATCH_OBJ OBJECT ${STMATCHGlob})
 
 add_library(FMMLIB SHARED
   $<TARGET_OBJECTS:MM_OBJ>
   $<TARGET_OBJECTS:FMM_OBJ>
-  $<TARGET_OBJECTS:STMATCH_OBJ>
   $<TARGET_OBJECTS:CORE>
   $<TARGET_OBJECTS:ALGORITHM>
   $<TARGET_OBJECTS:UTIL>
@@ -134,12 +131,8 @@ if(FMM_INSTALL_HEADER)
   ${CMAKE_CURRENT_SOURCE_DIR}/src/network
   ${CMAKE_CURRENT_SOURCE_DIR}/src/python
   ${CMAKE_CURRENT_SOURCE_DIR}/src/util
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/cxxopts
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fiboheap
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog)
-  set(FMM_API_HEADER
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/fmm-api.hpp
-  )
   install(
       DIRECTORY
       ${FMM_DIST_INCLUDE_PATH}
@@ -148,12 +141,6 @@ if(FMM_INSTALL_HEADER)
       FILES_MATCHING
       PATTERN "*.hpp"
       PATTERN "*.h"
-  )
-  install(
-      FILES
-      ${FMM_API_HEADER}
-      DESTINATION
-      "include/fmm"
   )
 else()
   message(STATUS "Not install fmm headers")

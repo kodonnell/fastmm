@@ -18,8 +18,6 @@
 #include <string>
 #include <boost/property_tree/ptree.hpp>
 
-#include "cxxopts/cxxopts.hpp"
-
 namespace FMM
 {
   namespace MM

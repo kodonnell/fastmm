@@ -1,49 +1,55 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "setuptools-scm>=8.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "fmm"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Fast Map Matching - High-performance map matching library"
 readme = "README.md"
-requires-python = ">=3.7"
-license = {text = "MIT"}
+requires-python = ">=3.8"
+license = "MIT"
 authors = [
-    {name = "Can Yang"},
+    {name = "kodonnell"},
 ]
 keywords = ["map-matching", "gps", "trajectory", "routing", "GIS"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: GIS",
 ]
 
 [project.optional-dependencies]
 matcher = []
-dev = ["pytest", "black", "mypy", "ruff"]
+dev = ["pytest", "ruff"]
 
 [project.urls]
-Homepage = "https://github.com/cyang-kth/fmm"
-Documentation = "https://fmm-wiki.github.io/"
-Repository = "https://github.com/cyang-kth/fmm"
+Homepage = "https://github.com/kodonnell/fmm"
+Documentation = "https://github.com/kodonnell/fmm"
+Repository = "https://github.com/kodonnell/fmm"
 
-[tool.setuptools.packages.find]
-where = ["python"]
+[tool.setuptools]
+packages = ["fmm"]
+package-dir = {"" = "python"}
 
-[tool.black]
-line-length = 100
-target-version = ['py37', 'py38', 'py39', 'py310', 'py311']
+[tool.setuptools.package-data]
+fmm = ["*.pyd", "*.dll", "*.so", "*.dylib"]
+
+[tool.setuptools_scm]
+write_to = "python/fmm/_version.py"
+version_scheme = "guess-next-dev"
+local_scheme = "no-local-version"
 
 [tool.ruff]
-line-length = 100
-target-version = "py37"
+line-length = 120
+target-version = "py38"
