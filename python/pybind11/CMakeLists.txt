@@ -34,10 +34,20 @@ target_link_libraries(fmm PRIVATE ${FMM_LINK_LIBS})
 # Use C++14
 set_target_properties(fmm PROPERTIES CXX_STANDARD 14)
 
-# Install to Python site-packages
-execute_process(
-  COMMAND ${PYTHON_EXECUTABLE} -c "import site; print(site.getsitepackages()[0])"
-  OUTPUT_VARIABLE PYTHON_SITE_PACKAGES OUTPUT_STRIP_TRAILING_WHITESPACE)
-set(CMAKE_INSTALL_PREFIX ${PYTHON_SITE_PACKAGES} CACHE PATH "Install path prefix, prepended onto install directories." FORCE)
-# install(TARGETS fmm LIBRARY DESTINATION "Lib/site-packages")
-install(TARGETS fmm LIBRARY DESTINATION .)
+# Install Python extension (.pyd) - MODULE libraries use LIBRARY destination even on Windows
+install(TARGETS fmm
+    LIBRARY DESTINATION .
+    COMPONENT python)
+
+# Install FMMLIB.dll - RUNTIME for shared libraries on Windows
+install(TARGETS FMMLIB
+    RUNTIME DESTINATION .
+    COMPONENT python)
+
+# Install Python source files
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/python/fmm/
+    DESTINATION .
+    COMPONENT python
+    FILES_MATCHING PATTERN "*.py"
+    PATTERN "__pycache__" EXCLUDE
+    PATTERN "*.egg-info" EXCLUDE)

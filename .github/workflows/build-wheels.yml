@@ -2,11 +2,11 @@ name: Build Wheels
 
 on:
   push:
-    branches: [ main ]  # Only run on direct pushes to main (not PR branches)
+    branches: [ main ]
     tags:
-      - 'v*'  # Run on version tags for releases
-  pull_request:  # Run on PRs to any branch
-  workflow_dispatch:  # Allow manual triggers
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   build_wheels:
@@ -14,52 +14,52 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest]
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+        os: [windows-latest]  # Add ubuntu-latest, macos-latest when ready
 
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for proper versioning
+          fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.16
+        env:
+          # Build for Python 3.8-3.12 (skip 3.13-3.14 until widely supported)
+          CIBW_BUILD: cp38-* cp39-* cp310-* cp311-* cp312-*
 
-      - name: Install Python build tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install build wheel setuptools setuptools-scm
+          # Install Boost before building
+          CIBW_BEFORE_BUILD_WINDOWS: >
+            vcpkg install boost-geometry:x64-windows boost-serialization:x64-windows &&
+            pip install scikit-build-core setuptools-scm pybind11
+          CIBW_BEFORE_BUILD_LINUX: >
+            yum install -y boost-devel cmake3 || apt-get update && apt-get install -y libboost-all-dev cmake &&
+            pip install scikit-build-core setuptools-scm pybind11
+          CIBW_BEFORE_BUILD_MACOS: >
+            brew install boost cmake &&
+            pip install scikit-build-core setuptools-scm pybind11
 
-      - name: Cache vcpkg
-        uses: actions/cache@v3
-        with:
-          path: C:\vcpkg\installed
-          key: ${{ runner.os }}-vcpkg-boost-${{ matrix.python-version }}
-          restore-keys: |
-            ${{ runner.os }}-vcpkg-boost-
+          # Set Boost paths for CMake
+          CIBW_ENVIRONMENT_WINDOWS: >
+            BOOST_ROOT=C:/vcpkg/installed/x64-windows
+            CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
-      - name: Install Boost (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          # Install only what we need:
-          # - boost-geometry (header-only, for spatial indexing)
-          # - boost-serialization (compiled library, for UBODT serialization)
-          vcpkg install boost-geometry:x64-windows boost-serialization:x64-windows
-          echo "BOOST_ROOT=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows" >> $env:GITHUB_ENV
-          echo "Boost_INCLUDE_DIR=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\include" >> $env:GITHUB_ENV
+          # Build verbosity
+          CIBW_BUILD_VERBOSITY: 1
 
-      - name: Build wheel using build script
-        if: runner.os == 'Windows'
-        run: |
-          .\build_wheel.ps1
+          # Skip PyPy and musllinux for now
+          CIBW_SKIP: pp* *-musllinux_*
+
+          # Test the wheel after building
+          CIBW_TEST_COMMAND: python -c "import fmm; print('fmm version:', fmm.__version__)"
+
+          # Windows-specific: use MSVC
+          CIBW_CONFIG_SETTINGS_WINDOWS: 'cmake.define.CMAKE_GENERATOR="Visual Studio 17 2022"'
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
-          path: dist/*.whl
+          name: wheels-${{ matrix.os }}
+          path: ./wheelhouse/*.whl
 
   publish:
     name: Publish to PyPI
