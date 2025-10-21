@@ -75,6 +75,16 @@ jobs:
           # Windows-specific: use MSVC
           CIBW_CONFIG_SETTINGS_WINDOWS: 'cmake.define.CMAKE_GENERATOR="Visual Studio 17 2022"'
 
+      - name: Save vcpkg cache (always)
+        if: always() && matrix.os == 'windows-latest'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            C:/vcpkg/installed
+            C:/vcpkg/downloads
+            C:/vcpkg/archives
+          key: vcpkg-${{ runner.os }}-boost
+
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
