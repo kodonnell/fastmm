@@ -10,15 +10,15 @@
  * @version: 2020.01.31
  */
 
-#ifndef FMM_TRANSITION_GRAPH_HPP
-#define FMM_TRANSITION_GRAPH_HPP
+#ifndef FASTMM_TRANSITION_GRAPH_HPP
+#define FASTMM_TRANSITION_GRAPH_HPP
 
 #include "network/type.hpp"
 #include "mm/mm_type.hpp"
 
 #include <float.h>
 
-namespace FMM
+namespace FASTMM
 {
 
   namespace MM
@@ -116,4 +116,4 @@ namespace FMM
 
   }
 }
-#endif /* FMM_TRANSITION_GRAPH_HPP */
+#endif /* FASTMM_TRANSITION_GRAPH_HPP */

@@ -1,9 +1,9 @@
-# Build script for FMM Windows wheel using scikit-build-core
+# Build script for FASTMM Windows wheel using scikit-build-core
 
 # Error handling
 $ErrorActionPreference = "Stop"
 
-Write-Host "Building FMM wheel..." -ForegroundColor Green
+Write-Host "Building FASTMM wheel..." -ForegroundColor Green
 
 # Clean previous builds
 Write-Host "Cleaning previous build artifacts..." -ForegroundColor Yellow

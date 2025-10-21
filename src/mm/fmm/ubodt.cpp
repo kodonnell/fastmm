@@ -14,10 +14,10 @@
 #include <boost/format.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 
-using namespace FMM;
-using namespace FMM::CORE;
-using namespace FMM::NETWORK;
-using namespace FMM::MM;
+using namespace FASTMM;
+using namespace FASTMM::CORE;
+using namespace FASTMM::NETWORK;
+using namespace FASTMM::MM;
 UBODT::UBODT(int buckets_arg, int multiplier_arg) : buckets(buckets_arg), multiplier(multiplier_arg)
 {
   SPDLOG_TRACE("Intialization UBODT with buckets {} multiplier {}",

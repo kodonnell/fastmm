@@ -6,16 +6,16 @@
 #include <vector>
 #include <sstream>
 
-std::ostream &FMM::CORE::operator<<(std::ostream &os,
-                                    const FMM::CORE::LineString &rhs)
+std::ostream &FASTMM::CORE::operator<<(std::ostream &os,
+                                    const FASTMM::CORE::LineString &rhs)
 {
   os << std::setprecision(12) << boost::geometry::wkt(rhs.line);
   return os;
 };
 
-FMM::CORE::LineString FMM::CORE::wkt2linestring(const std::string &wkt)
+FASTMM::CORE::LineString FASTMM::CORE::wkt2linestring(const std::string &wkt)
 {
-  FMM::CORE::LineString line;
+  FASTMM::CORE::LineString line;
   boost::geometry::read_wkt(wkt, line.get_geometry());
   return line;
 };

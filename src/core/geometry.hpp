@@ -8,14 +8,14 @@
  * @version: 2017.11.11
  */
 
-#ifndef FMM_GEOMTYPES_HPP
-#define FMM_GEOMTYPES_HPP
+#ifndef FASTMM_GEOMTYPES_HPP
+#define FASTMM_GEOMTYPES_HPP
 
 #include <boost/geometry.hpp>
 #include <string>
 #include <sstream>
 
-namespace FMM
+namespace FASTMM
 {
   /**
    * Core data types
@@ -235,7 +235,7 @@ namespace FMM
       linestring_t line;
     }; // LineString
 
-    std::ostream &operator<<(std::ostream &os, const FMM::CORE::LineString &rhs);
+    std::ostream &operator<<(std::ostream &os, const FASTMM::CORE::LineString &rhs);
 
     /**
      * Convert a wkt into a linestring
@@ -246,6 +246,6 @@ namespace FMM
 
   }; // CORE
 
-}; // FMM
+}; // FASTMM
 
-#endif // FMM_GEOMTYPES_HPP
+#endif // FASTMM_GEOMTYPES_HPP

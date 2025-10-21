@@ -1,4 +1,4 @@
-# pybind11 integration for FMM Python bindings
+# pybind11 integration for FASTMM Python bindings
 
 cmake_minimum_required(VERSION 3.5.1)
 
@@ -16,36 +16,34 @@ FetchContent_MakeAvailable(pybind11)
 
 include_directories(${PYTHON_INCLUDE_DIRS})
 
-set(FMM_SRC ${PROJECT_SOURCE_DIR}/python/pybind11/fmm_bindings.cpp)
+set(FASTMM_SRC ${PROJECT_SOURCE_DIR}/python/pybind11/fastmm_bindings.cpp)
 
-
-
-add_library(fmm MODULE ${FMM_SRC})
-set_target_properties(fmm PROPERTIES PREFIX "" OUTPUT_NAME "fmm")
+add_library(fastmm MODULE ${FASTMM_SRC})
+set_target_properties(fastmm PROPERTIES PREFIX "" OUTPUT_NAME "fastmm")
 if (WIN32)
-  set_target_properties(fmm PROPERTIES SUFFIX ".pyd")
+  set_target_properties(fastmm PROPERTIES SUFFIX ".pyd")
 endif()
-target_link_libraries(fmm PRIVATE pybind11::pybind11)
+target_link_libraries(fastmm PRIVATE pybind11::pybind11)
 
-# Link to core FMM library and Python
-set(FMM_LINK_LIBS FMMLIB ${PYTHON_LIBRARIES})
-target_link_libraries(fmm PRIVATE ${FMM_LINK_LIBS})
+# Link to core FASTMM library and Python
+set(FASTMM_LINK_LIBS FASTMMLIB ${PYTHON_LIBRARIES})
+target_link_libraries(fastmm PRIVATE ${FASTMM_LINK_LIBS})
 
 # Use C++14
-set_target_properties(fmm PROPERTIES CXX_STANDARD 14)
+set_target_properties(fastmm PROPERTIES CXX_STANDARD 14)
 
 # Install Python extension (.pyd) - MODULE libraries use LIBRARY destination even on Windows
-install(TARGETS fmm
+install(TARGETS fastmm
     LIBRARY DESTINATION .
     COMPONENT python)
 
-# Install FMMLIB.dll - RUNTIME for shared libraries on Windows
-install(TARGETS FMMLIB
+# Install FASTMMLIB.dll - RUNTIME for shared libraries on Windows
+install(TARGETS FASTMMLIB
     RUNTIME DESTINATION .
     COMPONENT python)
 
 # Install Python source files
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/python/fmm/
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/python/fastmm/
     DESTINATION .
     COMPONENT python
     FILES_MATCHING PATTERN "*.py"

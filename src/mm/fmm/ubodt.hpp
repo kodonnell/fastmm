@@ -7,14 +7,14 @@
  * @version: 2020.01.31
  */
 
-#ifndef FMM_UBODT_H_
-#define FMM_UBODT_H_
+#ifndef FASTMM_UBODT_H_
+#define FASTMM_UBODT_H_
 
 #include "network/type.hpp"
 #include "mm/transition_graph.hpp"
 #include "util/debug.hpp"
 
-namespace FMM
+namespace FASTMM
 {
   namespace MM
   {
@@ -144,4 +144,4 @@ namespace FMM
   }
 }
 
-#endif // FMM_SRC_FMM_FFMM_UBODT_H_
+#endif // FASTMM_SRC_FASTMM_FFASTMM_UBODT_H_

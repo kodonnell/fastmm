@@ -7,8 +7,8 @@
  * @version: 2017.11.11
  */
 
-#ifndef FMM_UTIL_HPP
-#define FMM_UTIL_HPP
+#ifndef FASTMM_UTIL_HPP
+#define FASTMM_UTIL_HPP
 
 #include "mm/mm_type.hpp"
 
@@ -61,7 +61,7 @@ namespace std
    * @return the stream with trajectory candidate information written
    */
   std::ostream &operator<<(std::ostream &os,
-                           const FMM::MM::TrajectoryCandidates &tr_cs);
+                           const FASTMM::MM::TrajectoryCandidates &tr_cs);
 
   /**
    * Write optimal candidate path into a stream
@@ -70,7 +70,7 @@ namespace std
    * @return the stream with candidate path information written
    */
   std::ostream &operator<<(std::ostream &os,
-                           const FMM::MM::OptCandidatePath &optimal_path);
+                           const FASTMM::MM::OptCandidatePath &optimal_path);
 
   /**
    * Write a point into a stream
@@ -79,11 +79,11 @@ namespace std
    * @return the stream with wkt point written.
    */
   std::ostream &operator<<(std::ostream &os,
-                           const FMM::CORE::Point &geom);
+                           const FASTMM::CORE::Point &geom);
 
 } // namespace std
 
-namespace FMM
+namespace FASTMM
 {
 
   /**
@@ -221,5 +221,5 @@ namespace FMM
     std::istream &safe_get_line(std::istream &is, std::string &t, char delim);
 
   } // Util
-} // FMM
-#endif /* FMM_UTIL_HPP */
+} // FASTMM
+#endif /* FASTMM_UTIL_HPP */

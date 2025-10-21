@@ -23,7 +23,7 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-project(fmm)
+project(fastmm)
 
 
 if (MSVC)
@@ -87,13 +87,13 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-# Creation of FMMLIB
+# Creation of FASTMMLIB
 
-set(FMM_INCLUDE_PATH
+set(FASTMM_INCLUDE_PATH
 ${CMAKE_CURRENT_SOURCE_DIR}/src
 ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 
-include_directories(${FMM_INCLUDE_PATH})
+include_directories(${FASTMM_INCLUDE_PATH})
 
 file(GLOB CoreGlob src/core/*.cpp)
 file(GLOB AlgorithmGlob src/algorithm/*.cpp)
@@ -107,11 +107,11 @@ add_library(ALGORITHM OBJECT ${AlgorithmGlob})
 add_library(UTIL OBJECT ${UtilGlob})
 add_library(NETWORK OBJECT ${NetworkGlob})
 add_library(MM_OBJ OBJECT ${MMGlob})
-add_library(FMM_OBJ OBJECT ${FMMGlob})
+add_library(FASTMM_OBJ OBJECT ${FMMGlob})
 
-add_library(FMMLIB SHARED
+add_library(FASTMMLIB SHARED
   $<TARGET_OBJECTS:MM_OBJ>
-  $<TARGET_OBJECTS:FMM_OBJ>
+  $<TARGET_OBJECTS:FASTMM_OBJ>
   $<TARGET_OBJECTS:CORE>
   $<TARGET_OBJECTS:ALGORITHM>
   $<TARGET_OBJECTS:UTIL>
@@ -120,11 +120,11 @@ add_library(FMMLIB SHARED
 
 message(STATUS "Installation folder ${CMAKE_INSTALL_PREFIX}")
 
-install(TARGETS FMMLIB LIBRARY DESTINATION lib)
+install(TARGETS FASTMMLIB LIBRARY DESTINATION lib)
 
-if(FMM_INSTALL_HEADER)
+if(FASTMM_INSTALL_HEADER)
   message(STATUS "Install fmm headers")
-  set(FMM_DIST_INCLUDE_PATH
+  set(FASTMM_DIST_INCLUDE_PATH
   ${CMAKE_CURRENT_SOURCE_DIR}/src/algorithm
   ${CMAKE_CURRENT_SOURCE_DIR}/src/core
   ${CMAKE_CURRENT_SOURCE_DIR}/src/mm
@@ -135,7 +135,7 @@ if(FMM_INSTALL_HEADER)
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog)
   install(
       DIRECTORY
-      ${FMM_DIST_INCLUDE_PATH}
+      ${FASTMM_DIST_INCLUDE_PATH}
       DESTINATION
       "include/fmm"
       FILES_MATCHING

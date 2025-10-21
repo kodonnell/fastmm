@@ -1,4 +1,4 @@
-// fmm_bindings.cpp: pybind11 bindings for FMM
+// fastmm_bindings.cpp: pybind11 bindings for FASTMM
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
@@ -13,14 +13,14 @@
 #include "mm/fmm/ubodt.hpp"
 
 namespace py = pybind11;
-using namespace FMM;
-using namespace FMM::CORE;
-using namespace FMM::NETWORK;
-using namespace FMM::MM;
+using namespace FASTMM;
+using namespace FASTMM::CORE;
+using namespace FASTMM::NETWORK;
+using namespace FASTMM::MM;
 
-PYBIND11_MODULE(fmm, m)
+PYBIND11_MODULE(fastmm, m)
 {
-    m.doc() = "Fast Map Matching (FMM) Python bindings via pybind11";
+    m.doc() = "Fast Map Matching (FASTMM) Python bindings via pybind11";
 
     // Point class
     py::class_<Point>(m, "Point")

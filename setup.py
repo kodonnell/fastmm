@@ -1,5 +1,5 @@
 """
-Setup script for fmm (Fast Map Matching) Python package.
+Setup script for fastmm (Fast Map Matching) Python package.
 
 This package requires building C++ extensions via CMake.
 """
@@ -9,7 +9,7 @@ from pathlib import Path
 from setuptools import find_packages, setup
 
 # Read version
-version_file = Path(__file__).parent / "python" / "fmm" / "_version.py"
+version_file = Path(__file__).parent / "python" / "fastmm" / "_version.py"
 if version_file.exists():
     exec(version_file.read_text())
     __version__ = locals().get("version", "0.1.0")
@@ -21,13 +21,13 @@ readme_file = Path(__file__).parent / "README.md"
 long_description = readme_file.read_text() if readme_file.exists() else ""
 
 setup(
-    name="fmm",
+    name="fastmm",
     version=__version__,
     description="Fast Map Matching - High-performance map matching library",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="kodonnell",
-    url="https://github.com/kodonnell/fmm",
+    url="https://github.com/kodonnell/fastmm",
     license="MIT",
     packages=find_packages(where="python"),
     package_dir={"": "python"},

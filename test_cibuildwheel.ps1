@@ -15,7 +15,9 @@ $env:CIBW_BUILD = "cp312-*"  # Only build for Python 3.12 (current version)
 # In CI, vcpkg will be used instead
 $condaPrefix = $env:CONDA_PREFIX
 if (-not $condaPrefix) {
-    $condaPrefix = "C:/Users/ko/miniforge3/envs/pyfmm"
+    # Error:
+    Write-Host "CONDA_PREFIX environment variable is not set. Please activate your conda environment." -ForegroundColor Red
+    exit 1
 }
 
 $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
@@ -42,7 +44,7 @@ $env:CIBW_BUILD_VERBOSITY = "1"
 $env:CIBW_SKIP = "pp* *-musllinux_* *-win32"
 
 # Test the wheel after building
-$env:CIBW_TEST_COMMAND = "python -c `"import fmm; print('fmm version:', fmm.__version__); net = fmm.Network(); print('Network created successfully!')`""
+$env:CIBW_TEST_COMMAND = "python -c `"import fastmm; print('fastmm version:', fastmm.__version__); net = fastmm.Network(); print('Network created successfully!')`""
 
 # Run cibuildwheel
 Write-Host "`nRunning cibuildwheel..." -ForegroundColor Green

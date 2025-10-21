@@ -4,11 +4,11 @@
 #include "network/network.hpp"
 #include "algorithm/geom_algorithm.hpp"
 
-using namespace FMM;
-using namespace FMM::CORE;
-using namespace FMM::ALGORITHM;
-using namespace FMM::NETWORK;
-using namespace FMM::MM;
+using namespace FASTMM;
+using namespace FASTMM::CORE;
+using namespace FASTMM::ALGORITHM;
+using namespace FASTMM::NETWORK;
+using namespace FASTMM::MM;
 using namespace std;
 
 TEST_CASE("Network is tested", "[network]")

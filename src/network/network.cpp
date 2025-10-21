@@ -13,10 +13,10 @@
 
 #include <boost/format.hpp>
 
-using namespace FMM;
-using namespace FMM::CORE;
-using namespace FMM::MM;
-using namespace FMM::NETWORK;
+using namespace FASTMM;
+using namespace FASTMM::CORE;
+using namespace FASTMM::MM;
+using namespace FASTMM::NETWORK;
 
 bool Network::candidate_compare(const Candidate &a, const Candidate &b)
 {
@@ -36,7 +36,7 @@ Network::Network() : num_vertices(0)
 }
 
 void Network::add_edge(EdgeID edge_id, NodeID source, NodeID target,
-                       const FMM::CORE::LineString &geom)
+                       const FASTMM::CORE::LineString &geom)
 {
   NodeIndex s_idx, t_idx;
   if (node_map.find(source) == node_map.end())

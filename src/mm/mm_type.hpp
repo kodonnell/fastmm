@@ -7,12 +7,12 @@
  * @version: 2020.01.31
  */
 
-#ifndef FMM_INCLUDE_FMM_FMM_RESULT_HPP_
-#define FMM_INCLUDE_FMM_FMM_RESULT_HPP_
+#ifndef FASTMM_INCLUDE_FASTMM_FASTMM_RESULT_HPP_
+#define FASTMM_INCLUDE_FASTMM_FASTMM_RESULT_HPP_
 
 #include "network/type.hpp"
 
-namespace FMM
+namespace FASTMM
 {
 
   /**
@@ -39,11 +39,11 @@ namespace FMM
      */
     struct Candidate
     {
-      FMM::NETWORK::NodeIndex index; /**< The index is defined for a specific candidate the index starting from N where N is the number of vertices in the graph */
-      double offset;                 /**< offset distance from the start of polyline to p' */
-      double dist;                   /**< distance from original point p to map matched point p' */
-      NETWORK::Edge *edge;           /**< candidate edge */
-      FMM::CORE::Point point;        /**< boost point */
+      FASTMM::NETWORK::NodeIndex index; /**< The index is defined for a specific candidate the index starting from N where N is the number of vertices in the graph */
+      double offset;                    /**< offset distance from the start of polyline to p' */
+      double dist;                      /**< distance from original point p to map matched point p' */
+      NETWORK::Edge *edge;              /**< candidate edge */
+      FASTMM::CORE::Point point;        /**< boost point */
     };
 
     typedef std::vector<Candidate> PointCandidates; /**< Point candidates */
@@ -53,8 +53,8 @@ namespace FMM
     typedef std::vector<const Candidate *> OptCandidatePath;
     /**< Optimal candidates*/
 
-    typedef std::vector<FMM::NETWORK::EdgeID> OptimalPath;  /**< Optimal path, edge id matched to each point in the trajectory */
-    typedef std::vector<FMM::NETWORK::EdgeID> CompletePath; /**< Complete path, ids of a sequence of topologically connected edges.*/
+    typedef std::vector<FASTMM::NETWORK::EdgeID> OptimalPath;  /**< Optimal path, edge id matched to each point in the trajectory */
+    typedef std::vector<FASTMM::NETWORK::EdgeID> CompletePath; /**< Complete path, ids of a sequence of topologically connected edges.*/
 
     /**
      * A candidate matched to a point
@@ -134,4 +134,4 @@ namespace FMM
 
 };
 
-#endif // FMM_INCLUDE_FMM_FMM_RESULT_HPP_
+#endif // FASTMM_INCLUDE_FASTMM_FASTMM_RESULT_HPP_

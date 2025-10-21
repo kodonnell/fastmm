@@ -39,7 +39,7 @@ namespace std
 {
 
   std::ostream &operator<<(std::ostream &os,
-                           const FMM::MM::TrajectoryCandidates &tr_cs)
+                           const FASTMM::MM::TrajectoryCandidates &tr_cs)
   {
     os << "\nCandidate "
        << std::fixed << std::setw(4) << "step" << ";"
@@ -66,7 +66,7 @@ namespace std
   }
 
   std::ostream &operator<<(std::ostream &os,
-                           const FMM::MM::OptCandidatePath &optimal_path)
+                           const FASTMM::MM::OptCandidatePath &optimal_path)
   {
     for (int i = 0; i < optimal_path.size(); ++i)
     {
@@ -79,7 +79,7 @@ namespace std
   }
 
   std::ostream &operator<<(std::ostream &os,
-                           const FMM::CORE::Point &geom)
+                           const FASTMM::CORE::Point &geom)
   {
     os << std::setprecision(12) << boost::geometry::wkt(geom);
     return os;
@@ -87,7 +87,7 @@ namespace std
 
 } // namespace std
 
-namespace FMM
+namespace FASTMM
 {
 
   namespace UTIL
@@ -234,4 +234,4 @@ namespace FMM
     }
 
   } // Util
-} // FMM
+} // FASTMM

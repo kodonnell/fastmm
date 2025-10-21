@@ -7,14 +7,14 @@
  * @version: 2017.11.11
  */
 
-#ifndef FMM_GPS_HPP
-#define FMM_GPS_HPP
+#ifndef FASTMM_GPS_HPP
+#define FASTMM_GPS_HPP
 
 #include "core/geometry.hpp"
 
 #include <vector>
 
-namespace FMM
+namespace FASTMM
 {
 
   namespace CORE
@@ -112,4 +112,4 @@ namespace FMM
   }
 
 }
-#endif /* FMM_GPS_HPP */
+#endif /* FASTMM_GPS_HPP */

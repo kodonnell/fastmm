@@ -21,18 +21,27 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Cache vcpkg installed packages (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: C:/vcpkg/installed
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('.github/workflows/build-wheels.yml') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.16
         env:
           # Build for Python 3.8-3.12 (skip 3.13-3.14 until widely supported)
           CIBW_BUILD: cp38-* cp39-* cp310-* cp311-* cp312-*
 
-          # Skip 32-bit builds, PyPy, and musllinux
-          CIBW_SKIP: pp* *-win32 *-musllinux_*
+          # Skip 32-bit builds and musllinux (PyPy not enabled)
+          CIBW_SKIP: "*-win32 *-musllinux_*"
 
           # Install Boost before building
           CIBW_BEFORE_BUILD_WINDOWS: >
-            vcpkg install boost-geometry:x64-windows boost-serialization:x64-windows &&
+            vcpkg install boost-geometry:x64-windows boost-serialization:x64-windows boost-format:x64-windows &&
             pip install scikit-build-core setuptools-scm pybind11 delvewheel
           CIBW_BEFORE_BUILD_LINUX: >
             yum install -y boost-devel cmake3 || apt-get update && apt-get install -y libboost-all-dev cmake &&
@@ -54,7 +63,7 @@ jobs:
           CIBW_BUILD_VERBOSITY: 1
 
           # Test the wheel after building
-          CIBW_TEST_COMMAND: python -c "import fmm; print('fmm version:', fmm.__version__)"
+          CIBW_TEST_COMMAND: python -c "import fastmm; print('fastmm version:', fastmm.__version__)"
 
           # Windows-specific: use MSVC
           CIBW_CONFIG_SETTINGS_WINDOWS: 'cmake.define.CMAKE_GENERATOR="Visual Studio 17 2022"'
@@ -64,6 +73,25 @@ jobs:
         with:
           name: wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
+
+  release:
+    name: Create GitHub release
+    needs: [build_wheels]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          pattern: wheels-*
+          merge-multiple: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*.whl
+          generate_release_notes: true
 
   publish:
     name: Publish to PyPI
@@ -78,7 +106,14 @@ jobs:
           pattern: wheels-*
           merge-multiple: true
 
+      - name: Publish to Test PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          repository_url: https://test.pypi.org/legacy/
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
+

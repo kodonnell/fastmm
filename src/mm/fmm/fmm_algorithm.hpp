@@ -7,8 +7,8 @@
  * @version: 2020.01.31
  */
 
-#ifndef FMM_FMM_ALGORITHM_H_
-#define FMM_FMM_ALGORITHM_H_
+#ifndef FASTMM_FASTMM_ALGORITHM_H_
+#define FASTMM_FASTMM_ALGORITHM_H_
 
 #include "network/network.hpp"
 #include "network/network_graph.hpp"
@@ -18,7 +18,7 @@
 #include <string>
 #include <boost/property_tree/ptree.hpp>
 
-namespace FMM
+namespace FASTMM
 {
   namespace MM
   {
@@ -115,4 +115,4 @@ namespace FMM
   }
 }
 
-#endif // FMM_FMM_ALGORITHM_H_
+#endif // FASTMM_FASTMM_ALGORITHM_H_

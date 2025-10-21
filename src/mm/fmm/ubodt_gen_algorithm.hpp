@@ -7,8 +7,8 @@
  * @version: 2020.01.31
  */
 
-#ifndef FMM_SRC_MM_FMM_UBODT_GEN_ALGORITHM_HPP_
-#define FMM_SRC_MM_FMM_UBODT_GEN_ALGORITHM_HPP_
+#ifndef FASTMM_SRC_MM_FASTMM_UBODT_GEN_ALGORITHM_HPP_
+#define FASTMM_SRC_MM_FASTMM_UBODT_GEN_ALGORITHM_HPP_
 
 #include "network/network.hpp"
 #include "network/network_graph.hpp"
@@ -18,7 +18,7 @@
 #endif
 #include <boost/archive/binary_oarchive.hpp>
 
-namespace FMM
+namespace FASTMM
 {
   namespace MM
   {
@@ -53,6 +53,6 @@ namespace FMM
       const NETWORK::NetworkGraph &ng_;
     }; // UBODTGenAlgorithm
   }; // MM
-}; // FMM
+}; // FASTMM
 
-#endif // FMM_SRC_MM_FMM_UBODT_GEN_ALGORITHM_HPP_
+#endif // FASTMM_SRC_MM_FASTMM_UBODT_GEN_ALGORITHM_HPP_

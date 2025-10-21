@@ -1,7 +1,7 @@
-# fmm - Fast Map Matching for Python
+# fastmm - Fast Map Matching for Python
 
 # Import C++ bindings
-from .fmm import *
+from .fastmm import *  # noqa: F401,F403
 
 # Import Python helpers
 from .matcher import MapMatcher

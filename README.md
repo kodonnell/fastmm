@@ -1,6 +1,10 @@
-# fmm
+# fastmm
 
-fmm is a map-matching library for python, that's designed to be fast, can run on windows, and simpler than spinning up OSRM / Valhalla options.
+fastmm is a fast (C++) map-matching library for python with no dependencies, and the ability to interpolate time on the match, not just position.
+
+It's based on a desire to map match a lot of vehicle trace data quickly, without the infrastructure to spin up OSRM / Valhalla. (And this is probably faster as there's no IPC ... ?)
+
+that's designed to be fast, can run on windows, and simpler than spinning up OSRM / Valhalla options.
 
 It is based on <https://github.com/cyang-kth/fmm> but updated to:
 
@@ -10,7 +14,7 @@ It is based on <https://github.com/cyang-kth/fmm> but updated to:
 - Focus on Python packaging with distributable wheels
 
 **Status:**
-- [x] FMM algorithm working
+- [x] FASTMM algorithm working
 - [x] Python API for network creation and matching
 - [x] MapMatcher helper class with auto-splitting and time interpolation
 - [x] Windows wheel builds
@@ -21,7 +25,7 @@ It is based on <https://github.com/cyang-kth/fmm> but updated to:
 ### From Pre-built Wheel
 
 ```bash
-pip install dist/fmm-<version>-py3-none-any.whl
+pip install dist/fastmm-<version>-py3-none-any.whl
 ```
 
 ### Building from Source (Windows)
@@ -37,8 +41,8 @@ pip install dist/fmm-<version>-py3-none-any.whl
 1. **Set up environment:**
 ```powershell
 # Create and activate conda environment
-conda create -n fmm python=3.11
-conda activate fmm
+conda create -n fastmm python=3.11
+conda activate fastmm
 
 # Install dependencies
 conda install boost openmp
@@ -72,17 +76,17 @@ Version numbering is automatic via `setuptools-scm` based on git tags.
 ## Usage
 
 ```python
-import fmm
-from fmm import Network, MapMatcher, UBODT, FastMapMatchConfig
+import fastmm
+from fastmm import Network, MapMatcher, UBODT, FastMapMatchConfig
 
 # Create network programmatically
 network = Network()
 
 # Add edges with geometries
 for edge_id, edge_data in your_edges.items():
-    geom = fmm.LineString()
+    geom = fastmm.LineString()
     for x, y in edge_data['coordinates']:
-        geom.add_point(fmm.Point(x, y))
+        geom.add_point(fastmm.Point(x, y))
     network.add_edge(edge_id, source_node, target_node, geom)
 
 # Build spatial index
