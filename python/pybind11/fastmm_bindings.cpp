@@ -1,4 +1,4 @@
-// pyfmm_bindings.cpp: pybind11 bindings for FMM
+// fastmm_bindings.cpp: pybind11 bindings for FASTMM
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
@@ -10,18 +10,44 @@
 #include "mm/mm_type.hpp"
 #include "mm/fmm/fmm_algorithm.hpp"
 #include "mm/fmm/ubodt_gen_algorithm.hpp"
-#include "mm/stmatch/stmatch_algorithm.hpp"
 #include "mm/fmm/ubodt.hpp"
 
 namespace py = pybind11;
-using namespace FMM;
-using namespace FMM::CORE;
-using namespace FMM::NETWORK;
-using namespace FMM::MM;
+using namespace FASTMM;
+using namespace FASTMM::CORE;
+using namespace FASTMM::NETWORK;
+using namespace FASTMM::MM;
 
-PYBIND11_MODULE(fmm, m)
+PYBIND11_MODULE(fastmm, m)
 {
-    m.doc() = "Fast Map Matching (FMM) Python bindings via pybind11";
+    m.doc() = "Fast Map Matching (FASTMM) Python bindings via pybind11";
+
+    // Point class
+    py::class_<Point>(m, "Point")
+        .def(py::init<double, double>(), py::arg("x"), py::arg("y"), "Create a Point with x, y coordinates")
+        .def("get_x", [](const Point &p)
+             { return boost::geometry::get<0>(p); }, "Get x coordinate")
+        .def("get_y", [](const Point &p)
+             { return boost::geometry::get<1>(p); }, "Get y coordinate")
+        .def("__repr__", [](const Point &p)
+             { return "<Point x=" + std::to_string(boost::geometry::get<0>(p)) +
+                      " y=" + std::to_string(boost::geometry::get<1>(p)) + ">"; });
+
+    // LineString class
+    py::class_<LineString>(m, "LineString")
+        .def(py::init<>(), "Create an empty LineString")
+        .def("add_point", py::overload_cast<double, double>(&LineString::add_point),
+             py::arg("x"), py::arg("y"), "Add a point to the linestring")
+        .def("get_num_points", &LineString::get_num_points, "Get the number of points in the linestring")
+        .def("get_x", &LineString::get_x, py::arg("i"), "Get x coordinate of i-th point")
+        .def("get_y", &LineString::get_y, py::arg("i"), "Get y coordinate of i-th point")
+        .def("get_length", &LineString::get_length, "Get the length of the linestring")
+        .def("export_wkt", &LineString::export_wkt, py::arg("precision") = 8, "Export as WKT string")
+        .def("export_json", &LineString::export_json, "Export as GeoJSON string")
+        .def_static("from_wkt", &wkt2linestring, py::arg("wkt"), "Create a LineString from WKT")
+        .def("__repr__", [](const LineString &l)
+             { return "<LineString with " + std::to_string(l.get_num_points()) + " points, length=" +
+                      std::to_string(l.get_length()) + ">"; });
 
     // MatchErrorCode enum
     py::enum_<MatchErrorCode>(m, "MatchErrorCode")
@@ -35,11 +61,15 @@ PYBIND11_MODULE(fmm, m)
 
     // Network class
     py::class_<Network>(m, "Network")
-        .def(py::init<const std::string &, const std::string &, const std::string &, const std::string &>(),
-             py::arg("filename"),
-             py::arg("id_name") = "id",
-             py::arg("source_name") = "source",
-             py::arg("target_name") = "target")
+        .def(py::init<>(), "Create an empty network. Use add_edge() to populate it, then call build_rtree_index().")
+        .def("add_edge", &Network::add_edge,
+             py::arg("edge_id"),
+             py::arg("source"),
+             py::arg("target"),
+             py::arg("geom"),
+             "Add an edge to the network. Call build_rtree_index() after adding all edges.")
+        .def("build_rtree_index", &Network::build_rtree_index,
+             "Build the spatial index. Must be called after adding all edges and before performing spatial queries.")
         .def("get_edge_count", &Network::get_edge_count)
         .def("get_node_count", &Network::get_node_count);
 

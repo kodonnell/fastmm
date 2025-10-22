@@ -7,13 +7,12 @@
  * @version: 2017.11.11
  */
 
-#ifndef FMM_NETWORK_HPP
-#define FMM_NETWORK_HPP
+#ifndef FASTMM_NETWORK_HPP
+#define FASTMM_NETWORK_HPP
 
 #include "network/type.hpp"
 #include "core/gps.hpp"
 #include "mm/mm_type.hpp"
-#include <ogrsf_frmts.h> // C++ API for GDAL
 #include <iostream>
 #include <math.h> // Calulating probability
 #include <iomanip>
@@ -25,7 +24,7 @@
 #include <boost/geometry/index/rtree.hpp>
 #include <boost/iterator/function_output_iterator.hpp>
 
-namespace FMM
+namespace FASTMM
 {
   /**
    * Classes related with network and graph
@@ -41,7 +40,7 @@ namespace FMM
       /**
        * Box of a edge
        */
-      typedef boost::geometry::model::box<FMM::CORE::Point> boost_box;
+      typedef boost::geometry::model::box<FASTMM::CORE::Point> boost_box;
       /**
        * Item stored in a node of Rtree
        */
@@ -53,19 +52,12 @@ namespace FMM
           Item, boost::geometry::index::quadratic<16>>
           Rtree;
       /**
-       *  Constructor of Network
+       *  Default constructor of Network (creates empty network)
        *
-       *  @param filename: the path to a network file in ESRI shapefile format
-       *  @param id_name: the name of the id field
-       *  @param source_name: the name of the source field
-       *  @param target_name: the name of the target field
-       *  @param mode: mode name, only applies to OSM network
-       *
+       *  Creates an empty network that can be populated using add_edge.
+       *  After adding all edges, call build_rtree_index() to build the spatial index.
        */
-      Network(const std::string &filename,
-              const std::string &id_name = "id",
-              const std::string &source_name = "source",
-              const std::string &target_name = "target");
+      Network();
       /**
        * Get number of nodes in the network
        * @return number of nodes
@@ -112,7 +104,7 @@ namespace FMM
        * @param index node index
        * @return point of a node
        */
-      FMM::CORE::Point get_node_geom_from_idx(NodeIndex index) const;
+      FASTMM::CORE::Point get_node_geom_from_idx(NodeIndex index) const;
 
       /**
        *  Search for k nearest neighboring (KNN) candidates of a
@@ -124,7 +116,7 @@ namespace FMM
        *  @return a pair of TrajectoryCandidates and vector of unmatched candidate indices
        *
        */
-      FMM::MM::TrajectoryCandidates search_tr_cs_knn(FMM::CORE::Trajectory &trajectory, std::size_t k, double radius) const;
+      FASTMM::MM::TrajectoryCandidates search_tr_cs_knn(FASTMM::CORE::Trajectory &trajectory, std::size_t k, double radius) const;
 
       /**
        * Search for k nearest neighboring (KNN) candidates of a
@@ -135,45 +127,45 @@ namespace FMM
        * @param radius search radius
        * @return a pair of TrajectoryCandidates and vector of unmatched candidate indices
        */
-      FMM::MM::TrajectoryCandidates search_tr_cs_knn(const FMM::CORE::LineString &geom, std::size_t k, double radius) const;
+      FASTMM::MM::TrajectoryCandidates search_tr_cs_knn(const FASTMM::CORE::LineString &geom, std::size_t k, double radius) const;
       /**
        * Get edge geometry
        * @param edge_id edge id
        * @return Geometry of edge
        */
-      const FMM::CORE::LineString &get_edge_geom(EdgeID edge_id) const;
+      const FASTMM::CORE::LineString &get_edge_geom(EdgeID edge_id) const;
       /**
        * Extract the geometry of a complete path, whose two end segment will be
        * clipped according to the input trajectory
        * @param traj input trajectory
        * @param complete_path complete path
        */
-      FMM::CORE::LineString complete_path_to_geometry(
-          const FMM::CORE::LineString &traj,
+      FASTMM::CORE::LineString complete_path_to_geometry(
+          const FASTMM::CORE::LineString &traj,
           const MM::CompletePath &complete_path) const;
       /**
        * Get all node geometry
        * @return a vector of points
        */
-      const std::vector<FMM::CORE::Point> &get_vertex_points() const;
+      const std::vector<FASTMM::CORE::Point> &get_vertex_points() const;
       /**
        * Get node geometry
        * @param u node index
        * @return geometry of node
        */
-      const FMM::CORE::Point &get_vertex_point(NodeIndex u) const;
+      const FASTMM::CORE::Point &get_vertex_point(NodeIndex u) const;
       /**
        * Extract the geometry of a route in the network
        * @param path a route stored with edge ID
        * @return the geometry of the route
        */
-      FMM::CORE::LineString route2geometry(const std::vector<EdgeID> &path) const;
+      FASTMM::CORE::LineString route2geometry(const std::vector<EdgeID> &path) const;
       /**
        * Extract the geometry of a route in the network
        * @param path a route stored with edge Index
        * @return the geometry of the route
        */
-      FMM::CORE::LineString route2geometry(
+      FASTMM::CORE::LineString route2geometry(
           const std::vector<EdgeIndex> &path) const;
       /**
        * Compare two candidate according to their GPS error
@@ -182,14 +174,24 @@ namespace FMM
        * @return true if a.dist<b.dist
        */
       static bool candidate_compare(const MM::Candidate &a, const MM::Candidate &b);
+      /**
+       * Add an edge to the network
+       * @param edge_id the ID of the edge
+       * @param source the source node ID
+       * @param target the target node ID
+       * @param geom the geometry of the edge as a LineString
+       */
       void add_edge(EdgeID edge_id, NodeID source, NodeID target,
-                    const FMM::CORE::LineString &geom);
+                    const FASTMM::CORE::LineString &geom);
+      /**
+       * Build rtree spatial index for the network
+       *
+       * This must be called after all edges have been added to the network
+       * and before performing any spatial queries.
+       */
+      void build_rtree_index();
 
     private:
-      void read_ogr_file(const std::string &filename,
-                         const std::string &id_name,
-                         const std::string &source_name,
-                         const std::string &target_name);
       /**
        * Concatenate a linestring segs to a linestring line, used in the
        * function complete_path_to_geometry
@@ -198,22 +200,17 @@ namespace FMM
        * @param segs: segs that will be appended to line
        * @param offset: the number of points skipped in segs.
        */
-      static void append_segs_to_line(FMM::CORE::LineString *line,
-                                      const FMM::CORE::LineString &segs,
+      static void append_segs_to_line(FASTMM::CORE::LineString *line,
+                                      const FASTMM::CORE::LineString &segs,
                                       int offset = 0);
-      /**
-       * Build rtree for the network
-       */
-      void build_rtree_index();
-      int srid;                // Spatial reference id
       Rtree rtree;             // Network rtree structure
       std::vector<Edge> edges; // all edges in the network
       NodeIDVec node_id_vec;
       unsigned int num_vertices;
       NodeIndexMap node_map;
       EdgeIndexMap edge_map;
-      std::vector<FMM::CORE::Point> vertex_points;
+      std::vector<FASTMM::CORE::Point> vertex_points;
     }; // Network
   } // NETWORK
-} // FMM
-#endif /* FMM_NETWORK_HPP */
+} // FASTMM
+#endif /* FASTMM_NETWORK_HPP */

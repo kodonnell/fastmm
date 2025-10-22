@@ -1,59 +1,41 @@
-# pyfmm
+# fastmm
 
-pyfmm is a map-matching library for python, that's designed to be fast, can run on windows, and simpler than spinning up OSRM / Valhalla options.
+fastmm is a fast (C++) map-matching library for python with no dependencies, and the ability to interpolate time on the match, not just position.
+
+It's based on a desire to map match a lot of vehicle trace data quickly, without the infrastructure to spin up OSRM / Valhalla. (And this is probably faster as there's no IPC ... ?)
 
 It is based on <https://github.com/cyang-kth/fmm> but updated to:
 
-- Have some extra features (specifically making it easier to interpolate time along matched routes)
-- Be updated
-- Buildable on windows
-- Focus on python, and remove a lot of the other GUI/examples/etc. stuff. At this stage, see the original repo for demonstrations of how it performs etc. - we just want to wrap it nicely in python.
+- Remove GDAL/OGR dependencies - networks are created programmatically from Python
+- Include Python helper classes for automatic trajectory splitting and time interpolation
+- Be buildable on Windows/Linux/Mac with modern tooling
+- Focus on Python packaging with distributable wheels
+- Remove STMatch - we'll focus on FMM for now
 
-Status:
+**Status:**
 
-- Working for FMM
-- STMatch might be migrated, but haven't checked.
+- [ ] Tested ... = )
+- [ ] MapMatcher helper class with auto-splitting and time interpolation
+- [x] FASTMM algorithm working
+- [x] Python API for network creation and matching
+- [x] Windows, linux, and macOS wheel builds
 
-## Building/installing
 
-My rough note on Windows using conda.
+## Installation
 
-install cmake
-
-activate repo to install into
-
-mamba install gdal
-$env:GDAL_DIR = "$env:CONDA_PREFIX\Library"
-$env:GDAL_LIBRARY = "$env:CONDA_PREFIX\Library\lib\gdal.lib"
-$env:GDAL_INCLUDE_DIR = "$env:CONDA_PREFIX\Library\include"
-
-mamba install boost
-$env:BOOST_ROOT = "$env:CONDA_PREFIX\Library"
-$env:BOOST_INCLUDEDIR = "$env:CONDA_PREFIX\Library\include"
-$env:BOOST_LIBRARYDIR = "$env:CONDA_PREFIX\Library\lib"
-
-mamba install swig
-$env:SWIG_EXECUTABLE = "$env:CONDA_PREFIX\Library\bin\swig.exe"
-$env:SWIG_DIR = "$env:CONDA_PREFIX\Library\share\swig"
-
-mkdir build
-cd build
-cmake .. -G "Visual Studio 17 2022" -A x64
-cmake --build . --config Release --parallel 8
-
-Go to build/python
-copy Release/_fmm.pyc to .
-Copy ../Release/FMMLIB.dll to .
-add this location to sys.path and you should be able to `import fmm`
+```bash
+pip install fastmm
+```
 
 ## TODO
 
 - Bring in extra python code.
-- check tests work.
-- Set up builds so boost etc. is bundled into whl, and cibuildwheel for linux/mac/windows.
+- Get test working in python.
 - If not found in UBODT, instead of bailing, do a normal djikstra lookup.
 - Need to check reverse tolerance - on our edges, they're all directed, so we probably shouldn't allow reversing. This causes errors when we're parsing - if you reverse on the same edge, the geometry gets flipped (I think - line = ALGORITHM::cutoffseg_unique(e0.geom, start_offset, end_offset); goes backward?), which then messes with our python post-processing of associating time as the segment start/stop are now the edge stop/start, not the other way round. We could add a reversed flag to the edge? That would help. For now, just don't have a reverse tolerance.
 - Could move the journey splitting (e.g. when unmatched candidate or points too far apart) into the C++ code here. Would be more optimal as a) C++, and b) don't need to repeat candidate lookup etc.
+- Improve serialization of UBODT to be cross-platform.
+- Specify versions for build libs (e.g. cibuildwheel).
 
 ### Custom costs
 

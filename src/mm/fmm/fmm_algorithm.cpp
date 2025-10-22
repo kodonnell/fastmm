@@ -7,10 +7,10 @@
 #include "util/util.hpp"
 #include "util/debug.hpp"
 
-using namespace FMM;
-using namespace FMM::CORE;
-using namespace FMM::NETWORK;
-using namespace FMM::MM;
+using namespace FASTMM;
+using namespace FASTMM::CORE;
+using namespace FASTMM::NETWORK;
+using namespace FASTMM::MM;
 
 FastMapMatchConfig::FastMapMatchConfig(int k_arg,
                                        double candidate_search_radius,
@@ -97,7 +97,7 @@ PyMatchResult FastMapMatch::pymatch_trajectory(const CORE::Trajectory &trajector
   output.last_connected_trajectory_point = result.last_connected_trajectory_point;
   output.unmatched_candidate_indices = result.unmatched_candidate_indices;
   output.segments = std::vector<PyMatchSegment>{};
-  FMM::MM::CompletePath edge_ids = result.complete_path;
+  FASTMM::MM::CompletePath edge_ids = result.complete_path;
 
   if (result.error_code != MatchErrorCode::SUCCESS)
   {
@@ -139,7 +139,7 @@ PyMatchResult FastMapMatch::pymatch_trajectory(const CORE::Trajectory &trajector
         mc1.c.dist,
         mc1.c.offset};
     double start_offset, end_offset, start_distance;
-    FMM::CORE::LineString line;
+    FASTMM::CORE::LineString line;
     std::vector<PyMatchPoint> points;
     PyMatchSegment segment = {start_candidate, end_candidate, {}};
     std::vector<double> distances;

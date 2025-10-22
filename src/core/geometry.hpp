@@ -8,15 +8,14 @@
  * @version: 2017.11.11
  */
 
-#ifndef FMM_GEOMTYPES_HPP
-#define FMM_GEOMTYPES_HPP
+#ifndef FASTMM_GEOMTYPES_HPP
+#define FASTMM_GEOMTYPES_HPP
 
-#include <ogrsf_frmts.h> // C++ API for GDAL
 #include <boost/geometry.hpp>
 #include <string>
 #include <sstream>
 
-namespace FMM
+namespace FASTMM
 {
   /**
    * Core data types
@@ -236,29 +235,7 @@ namespace FMM
       linestring_t line;
     }; // LineString
 
-    std::ostream &operator<<(std::ostream &os, const FMM::CORE::LineString &rhs);
-
-    /**
-     * Convert a OGRLineString to a linestring
-     * @param line a pointer to OGRLineString
-     * @return a linestring
-     */
-    LineString ogr2linestring(const OGRLineString *line);
-
-    /**
-     * Convert a OGRMultiLineString to a linestring.
-     *
-     * If the multilinestring contains multiple lines, only
-     * the first linestring will be converted and returned as
-     * a result.
-     *
-     * This function is used in reading data from shapefile.
-     *
-     * @param mline a pointer to the OGRMultiLineString
-     * @return a linestring.
-     *
-     */
-    LineString ogr2linestring(const OGRMultiLineString *mline);
+    std::ostream &operator<<(std::ostream &os, const FASTMM::CORE::LineString &rhs);
 
     /**
      * Convert a wkt into a linestring
@@ -269,6 +246,6 @@ namespace FMM
 
   }; // CORE
 
-}; // FMM
+}; // FASTMM
 
-#endif // FMM_GEOMTYPES_HPP
+#endif // FASTMM_GEOMTYPES_HPP

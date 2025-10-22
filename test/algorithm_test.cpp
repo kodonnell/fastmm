@@ -3,9 +3,9 @@
 #include "util/debug.hpp"
 #include "algorithm/geom_algorithm.hpp"
 
-using namespace FMM;
-using namespace FMM::CORE;
-using namespace FMM::ALGORITHM;
+using namespace FASTMM;
+using namespace FASTMM::CORE;
+using namespace FASTMM::ALGORITHM;
 using namespace std;
 
 TEST_CASE( "Algorithm are tested", "[algorithm]" ) {

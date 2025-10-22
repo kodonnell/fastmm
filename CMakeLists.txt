@@ -1,4 +1,4 @@
-cmake_minimum_required( VERSION 3.5.1)
+cmake_minimum_required( VERSION 3.15)
 
 message(STATUS "CMAKE version ${CMAKE_VERSION}")
 
@@ -23,7 +23,7 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-project(fmm)
+project(fastmm)
 
 
 if (MSVC)
@@ -53,16 +53,6 @@ else()
   message(STATUS "Non conda exist, search library in default path")
 endif()
 
-find_package(GDAL 2.2 REQUIRED)
-if (GDAL_FOUND)
-  message(STATUS "GDAL headers found at ${GDAL_INCLUDE_DIR}")
-  message(STATUS "GDAL library found at ${GDAL_LIBRARIES}")
-  include_directories(${GDAL_INCLUDE_DIR})
-else()
-  message(FATAL_ERROR "GDAL Not Found!")
-endif (GDAL_FOUND)
-link_libraries(${GDAL_LIBRARIES})
-
 if (WIN32)
   find_package(Boost 1.56.0 REQUIRED serialization exception)
 else ()
@@ -84,6 +74,9 @@ if(OPENMP_FOUND)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
   message(STATUS "OpenMP_HEADERS found at ${OpenMP_CXX_INCLUDE_DIRS}")
   message(STATUS "OpenMP_CXX_LIBRARIES found at ${OpenMP_CXX_LIBRARIES}")
+  if(OpenMP_CXX_INCLUDE_DIRS)
+    include_directories(${OpenMP_CXX_INCLUDE_DIRS})
+  endif()
 endif()
 link_libraries(${OpenMP_CXX_LIBRARIES})
 
@@ -97,13 +90,13 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-# Creation of FMMLIB
+# Creation of FASTMMLIB
 
-set(FMM_INCLUDE_PATH
+set(FASTMM_INCLUDE_PATH
 ${CMAKE_CURRENT_SOURCE_DIR}/src
 ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 
-include_directories(${FMM_INCLUDE_PATH})
+include_directories(${FASTMM_INCLUDE_PATH})
 
 file(GLOB CoreGlob src/core/*.cpp)
 file(GLOB AlgorithmGlob src/algorithm/*.cpp)
@@ -111,7 +104,6 @@ file(GLOB NetworkGlob src/network/*.cpp)
 file(GLOB UtilGlob src/util/*.cpp)
 file(GLOB MMGlob src/mm/*.cpp)
 file(GLOB FMMGlob src/mm/fmm/*.cpp)
-file(GLOB STMATCHGlob src/mm/stmatch/*.cpp)
 
 add_library(CORE OBJECT ${CoreGlob})
 add_library(ALGORITHM OBJECT ${AlgorithmGlob})
@@ -119,58 +111,32 @@ add_library(UTIL OBJECT ${UtilGlob})
 add_library(NETWORK OBJECT ${NetworkGlob})
 add_library(MM_OBJ OBJECT ${MMGlob})
 add_library(FMM_OBJ OBJECT ${FMMGlob})
-add_library(STMATCH_OBJ OBJECT ${STMATCHGlob})
 
-add_library(FMMLIB SHARED
+add_library(FASTMMLIB SHARED
   $<TARGET_OBJECTS:MM_OBJ>
   $<TARGET_OBJECTS:FMM_OBJ>
-  $<TARGET_OBJECTS:STMATCH_OBJ>
   $<TARGET_OBJECTS:CORE>
   $<TARGET_OBJECTS:ALGORITHM>
   $<TARGET_OBJECTS:UTIL>
   $<TARGET_OBJECTS:NETWORK>)
 
+# Set the output name to lowercase for consistency
+set_target_properties(FASTMMLIB PROPERTIES OUTPUT_NAME "fastmmlib")
 
-message(STATUS "Installation folder ${CMAKE_INSTALL_PREFIX}")
-
-install(TARGETS FMMLIB LIBRARY DESTINATION lib)
-
-if(FMM_INSTALL_HEADER)
-  message(STATUS "Install fmm headers")
-  set(FMM_DIST_INCLUDE_PATH
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/algorithm
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/core
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/mm
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/network
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/python
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/util
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/cxxopts
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fiboheap
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog)
-  set(FMM_API_HEADER
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/fmm-api.hpp
-  )
-  install(
-      DIRECTORY
-      ${FMM_DIST_INCLUDE_PATH}
-      DESTINATION
-      "include/fmm"
-      FILES_MATCHING
-      PATTERN "*.hpp"
-      PATTERN "*.h"
-  )
-  install(
-      FILES
-      ${FMM_API_HEADER}
-      DESTINATION
-      "include/fmm"
-  )
-else()
-  message(STATUS "Not install fmm headers")
+# On Windows, ensure DLL goes to the same location for all configurations
+if(WIN32)
+    foreach(config ${CMAKE_CONFIGURATION_TYPES})
+        string(TOUPPER ${config} config_upper)
+        set_target_properties(FASTMMLIB PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY_${config_upper} "${CMAKE_BINARY_DIR}/${config}"
+            LIBRARY_OUTPUT_DIRECTORY_${config_upper} "${CMAKE_BINARY_DIR}/${config}"
+            ARCHIVE_OUTPUT_DIRECTORY_${config_upper} "${CMAKE_BINARY_DIR}/${config}")
+    endforeach()
 endif()
 
-# message(STATUS "Add python cmake information")
-# add_subdirectory(python)
-add_subdirectory(python/pybind11)
-# add_subdirectory(test EXCLUDE_FROM_ALL)
+message(STATUS "Installation folder ${CMAKE_INSTALL_PREFIX}")
+message(STATUS "FASTMMLIB target type: $<TARGET_PROPERTY:FASTMMLIB,TYPE>")
 
+# FASTMMLIB installation is handled in python/pybind11/CMakeLists.txt with the python component
+
+add_subdirectory(python/pybind11)

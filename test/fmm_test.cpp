@@ -8,11 +8,11 @@
 #include "core/gps.hpp"
 #include "io/gps_reader.hpp"
 
-using namespace FMM;
-using namespace FMM::IO;
-using namespace FMM::CORE;
-using namespace FMM::NETWORK;
-using namespace FMM::MM;
+using namespace FASTMM;
+using namespace FASTMM::IO;
+using namespace FASTMM::CORE;
+using namespace FASTMM::NETWORK;
+using namespace FASTMM::MM;
 
 TEST_CASE("fmm is tested", "[fmm]")
 {

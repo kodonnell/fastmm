@@ -1,0 +1,4 @@
+include README.md
+include LICENSE.TXT
+include pyproject.toml
+recursive-include python/fastmm *.py *.pyd *.dll *.so *.dylib

@@ -3,9 +3,8 @@
 #include "util/util.hpp"
 #include "algorithm/geom_algorithm.hpp"
 
-#include <ogrsf_frmts.h> // C++ API for GDAL
-#include <math.h>        // Calulating probability
-#include <algorithm>     // Partial sort copy
+#include <math.h>    // Calulating probability
+#include <algorithm> // Partial sort copy
 #include <stdexcept>
 
 // Data structures for Rtree
@@ -14,10 +13,10 @@
 
 #include <boost/format.hpp>
 
-using namespace FMM;
-using namespace FMM::CORE;
-using namespace FMM::MM;
-using namespace FMM::NETWORK;
+using namespace FASTMM;
+using namespace FASTMM::CORE;
+using namespace FASTMM::MM;
+using namespace FASTMM::NETWORK;
 
 bool Network::candidate_compare(const Candidate &a, const Candidate &b)
 {
@@ -31,26 +30,13 @@ bool Network::candidate_compare(const Candidate &a, const Candidate &b)
   }
 }
 
-Network::Network(const std::string &filename,
-                 const std::string &id_name,
-                 const std::string &source_name,
-                 const std::string &target_name)
+Network::Network() : num_vertices(0)
 {
-  if (FMM::UTIL::check_file_extension(filename, "shp") ||
-      FMM::UTIL::check_file_extension(filename, "gpkg"))
-  {
-    read_ogr_file(filename, id_name, source_name, target_name);
-  }
-  else
-  {
-    std::string message = (boost::format("Network file not supported %1%") % filename).str();
-    SPDLOG_CRITICAL(message);
-    throw std::runtime_error(message);
-  }
+  SPDLOG_INFO("Created empty network");
 }
 
 void Network::add_edge(EdgeID edge_id, NodeID source, NodeID target,
-                       const FMM::CORE::LineString &geom)
+                       const FASTMM::CORE::LineString &geom)
 {
   NodeIndex s_idx, t_idx;
   if (node_map.find(source) == node_map.end())
@@ -79,141 +65,8 @@ void Network::add_edge(EdgeID edge_id, NodeID source, NodeID target,
   EdgeIndex index = edges.size();
   edges.push_back({index, edge_id, s_idx, t_idx, geom.get_length(), geom});
   edge_map.insert({edge_id, index});
-};
-
-void Network::read_ogr_file(const std::string &filename,
-                            const std::string &id_name,
-                            const std::string &source_name,
-                            const std::string &target_name)
-{
-  SPDLOG_INFO("Read network from file {}", filename);
-  OGRRegisterAll();
-  GDALDataset *poDS = (GDALDataset *)GDALOpenEx(
-      filename.c_str(), GDAL_OF_VECTOR, NULL, NULL, NULL);
-  if (poDS == NULL)
-  {
-    std::string message = "Open dataset failed.";
-    SPDLOG_CRITICAL(message);
-    throw std::runtime_error(message);
-  }
-  OGRLayer *ogrlayer = poDS->GetLayer(0);
-  int NUM_FEATURES = ogrlayer->GetFeatureCount();
-  // edges= std::vector<Edge>(NUM_FEATURES);
-  // Initialize network edges
-  OGRFeatureDefn *ogrFDefn = ogrlayer->GetLayerDefn();
-  OGRFeature *ogrFeature;
-
-  // Fetch the field index given field name.
-  int id_idx = ogrFDefn->GetFieldIndex(id_name.c_str());
-  int source_idx = ogrFDefn->GetFieldIndex(source_name.c_str());
-  int target_idx = ogrFDefn->GetFieldIndex(target_name.c_str());
-  if (source_idx < 0 || target_idx < 0 || id_idx < 0)
-  {
-    std::string error_message = fmt::format(
-        "Field not found: {} index {}, {} index {}, {} index {}",
-        id_name, id_idx, source_name, source_idx,
-        target_name, target_idx);
-    SPDLOG_CRITICAL(error_message);
-    GDALClose(poDS);
-    throw std::runtime_error(error_message);
-  }
-
-  if (wkbFlatten(ogrFDefn->GetGeomType()) != wkbLineString)
-  {
-    std::string error_message = fmt::format(
-        "Geometry type of network is {}, should be linestring",
-        OGRGeometryTypeToName(ogrFDefn->GetGeomType()));
-    SPDLOG_CRITICAL(error_message);
-    GDALClose(poDS);
-    throw std::runtime_error(error_message);
-  }
-  else
-  {
-    SPDLOG_DEBUG("Geometry type of network is {}",
-                 OGRGeometryTypeToName(ogrFDefn->GetGeomType()));
-  }
-  // OGRSpatialReference *ogrsr = ogrFDefn->GetGeomFieldDefn(0)->GetSpatialRef();
-  const OGRSpatialReference *ogrsr = ogrFDefn->GetGeomFieldDefn(0)->GetSpatialRef();
-  if (ogrsr != nullptr)
-  {
-    srid = ogrsr->GetEPSGGeogCS();
-    if (srid == -1)
-    {
-      srid = 4326;
-      SPDLOG_WARN("SRID is not found, set to 4326 by default");
-    }
-    else
-    {
-      SPDLOG_DEBUG("SRID is {}", srid);
-    }
-  }
-  else
-  {
-    srid = 4326;
-    SPDLOG_WARN("SRID is not found, set to 4326 by default");
-  }
-  // Read data from shapefile
-  EdgeIndex index = 0;
-  while ((ogrFeature = ogrlayer->GetNextFeature()) != NULL)
-  {
-    EdgeID id = ogrFeature->GetFieldAsInteger64(id_idx);
-    NodeID source = ogrFeature->GetFieldAsInteger64(source_idx);
-    NodeID target = ogrFeature->GetFieldAsInteger64(target_idx);
-    OGRGeometry *rawgeometry = ogrFeature->GetGeometryRef();
-    LineString geom;
-    if (rawgeometry->getGeometryType() == wkbLineString)
-    {
-      geom = ogr2linestring((OGRLineString *)rawgeometry);
-    }
-    else if (rawgeometry->getGeometryType() == wkbMultiLineString)
-    {
-      SPDLOG_TRACE("Feature id {} s {} t {} is multilinestring",
-                   id, source, target);
-      SPDLOG_TRACE("Read only the first linestring");
-      geom = ogr2linestring((OGRMultiLineString *)rawgeometry);
-    }
-    else
-    {
-      SPDLOG_CRITICAL("Unknown geometry type for feature id {} s {} t {}",
-                      id, source, target);
-    }
-    NodeIndex s_idx, t_idx;
-    if (node_map.find(source) == node_map.end())
-    {
-      s_idx = node_id_vec.size();
-      node_id_vec.push_back(source);
-      node_map.insert({source, s_idx});
-      vertex_points.push_back(geom.get_point(0));
-    }
-    else
-    {
-      s_idx = node_map[source];
-    }
-    if (node_map.find(target) == node_map.end())
-    {
-      t_idx = node_id_vec.size();
-      node_id_vec.push_back(target);
-      node_map.insert({target, t_idx});
-      int npoints = geom.get_num_points();
-      vertex_points.push_back(geom.get_point(npoints - 1));
-    }
-    else
-    {
-      t_idx = node_map[target];
-    }
-    edges.push_back({index, id, s_idx, t_idx, geom.get_length(), geom});
-    edge_map.insert({id, index});
-    ++index;
-    OGRFeature::DestroyFeature(ogrFeature);
-  }
-  GDALClose(poDS);
   num_vertices = node_id_vec.size();
-  SPDLOG_INFO("Number of edges {} nodes {}", edges.size(), num_vertices);
-  SPDLOG_INFO("Field index: id {} source {} target {}",
-              id_idx, source_idx, target_idx);
-  build_rtree_index();
-  SPDLOG_INFO("Read network done.");
-} // Network constructor
+};
 
 int Network::get_node_count() const
 {
@@ -311,7 +164,6 @@ TrajectoryCandidates Network::search_tr_cs_knn(const LineString &geom, std::size
     for (unsigned int j = 0; j < Nitems; ++j)
     {
       // Check for detailed intersection
-      // The two edges are all in OGR_linestring
       Edge *edge = temp[j].second;
       double offset;
       double dist;

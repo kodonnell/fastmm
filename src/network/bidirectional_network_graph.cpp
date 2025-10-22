@@ -10,9 +10,9 @@
 #include <unordered_map>
 #include <queue>
 
-using namespace FMM;
-using namespace FMM::CORE;
-using namespace FMM::NETWORK;
+using namespace FASTMM;
+using namespace FASTMM::CORE;
+using namespace FASTMM::NETWORK;
 
 BidirectionalNetworkGraph::BidirectionalNetworkGraph(
   const Network &network_arg) : NetworkGraph(network_arg){

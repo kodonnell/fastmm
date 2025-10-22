@@ -91,6 +91,37 @@
         "typeindex": "cpp"
     },
     "cSpell.words": [
-        "ubodt"
+        "auditwheel",
+        "binarycaching",
+        "buildsystems",
+        "cibuildwheel",
+        "CIBW",
+        "DCMAKE",
+        "delvewheel",
+        "devel",
+        "DSPDLOG",
+        "fastmm",
+        "FASTMMLIB",
+        "kodonnell",
+        "LASTEXITCODE",
+        "libfastmmlib",
+        "libomp",
+        "manylinux",
+        "MSVC",
+        "musllinux",
+        "OPENMP",
+        "pybind",
+        "pypa",
+        "pypi",
+        "pyproject",
+        "pytest",
+        "RPATH",
+        "scikit",
+        "setuptools",
+        "skbuild",
+        "softprops",
+        "ubodt",
+        "vcpkg",
+        "venv"
     ]
 }

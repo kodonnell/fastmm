@@ -7,12 +7,12 @@
  * @version: 2020.01.31
  */
 
-#ifndef FMM_COMPOSITEGRAPH_HPP
-#define FMM_COMPOSITEGRAPH_HPP
+#ifndef FASTMM_COMPOSITEGRAPH_HPP
+#define FASTMM_COMPOSITEGRAPH_HPP
 
 #include "network/network_graph.hpp"
 
-namespace FMM
+namespace FASTMM
 {
 
   namespace MM

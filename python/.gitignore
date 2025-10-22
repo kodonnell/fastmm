@@ -29,6 +29,7 @@ pcre
 *.so.*
 *.dylib
 *.bundle
+*.pyd
 
 # C/C++ static libraries, based on:
 #   https://github.com/github/gitignore/blob/master/C.gitignore
@@ -53,6 +54,10 @@ pcre
 *-gypcopy.cxx
 
 *.pyc
+
+# Python packaging artifacts
+*.egg-info/
+_version.py
 
 # Out of source tree build directories
 *build*/

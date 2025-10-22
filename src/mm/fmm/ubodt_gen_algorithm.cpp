@@ -9,10 +9,10 @@
 #include <fstream>
 #include <omp.h>
 
-using namespace FMM;
-using namespace FMM::CORE;
-using namespace FMM::NETWORK;
-using namespace FMM::MM;
+using namespace FASTMM;
+using namespace FASTMM::CORE;
+using namespace FASTMM::NETWORK;
+using namespace FASTMM::MM;
 
 void UBODTGenAlgorithm::generate_ubodt(const std::string &filename, double delta) const
 {

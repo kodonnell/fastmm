@@ -2,9 +2,9 @@
 
 #include <boost/geometry/index/rtree.hpp>
 
-using namespace FMM;
-using namespace FMM::CORE;
-using namespace FMM::NETWORK;
+using namespace FASTMM;
+using namespace FASTMM::CORE;
+using namespace FASTMM::NETWORK;
 
 unsigned int NodeTree::insert_point(Point &p){
   unsigned int id = size;
