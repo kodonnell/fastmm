@@ -92,6 +92,7 @@ manylinux-i686-image = "manylinux_2_28"
 
 [tool.cibuildwheel.macos]
 before-build = "brew install boost cmake libomp"
+environment = { OpenMP_ROOT = "$(brew --prefix libomp)" }
 
 [tool.ruff]
 line-length = 120
