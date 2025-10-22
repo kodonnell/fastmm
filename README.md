@@ -17,96 +17,19 @@ It is based on <https://github.com/cyang-kth/fmm> but updated to:
 - [x] FASTMM algorithm working
 - [x] Python API for network creation and matching
 - [x] MapMatcher helper class with auto-splitting and time interpolation
-- [x] Windows wheel builds
+- [x] Windows, linux, and macOS wheel builds
 - [ ] STMatch removed (FMM is primary algorithm)
 
 ## Installation
 
-### From Pre-built Wheel
-
 ```bash
-pip install dist/fastmm-<version>-py3-none-any.whl
+pip install fastmm
 ```
-
-### Building from Source (Windows)
-
-**Prerequisites:**
-- Visual Studio 2022 with C++ tools
-- CMake 3.5+
-- Python 3.8+
-- Conda/Mamba (for Boost and OpenMP)
-
-**Steps:**
-
-1. **Set up environment:**
-```powershell
-# Create and activate conda environment
-conda create -n fastmm python=3.11
-conda activate fastmm
-
-# Install dependencies
-conda install boost openmp
-
-# Install Python build tools
-pip install build wheel setuptools setuptools-scm
-```
-
-2. **Build the wheel:**
-```powershell
-# Simply run the build script
-.\build_wheel.ps1
-```
-
-The wheel will be created in `dist/` directory.
-
-3. **Optional - Create a versioned release:**
-
-By default, the build creates a development version (e.g., `0.1.dev2`). To create a proper release version:
-
-```powershell
-# Tag the release
-git tag v0.2.0 -m "Release version 0.2.0"
-
-# Build (will use the tag for version)
-.\build_wheel.ps1
-```
-
-Version numbering is automatic via `setuptools-scm` based on git tags.
-
-## Usage
-
-```python
-import fastmm
-from fastmm import Network, MapMatcher, UBODT, FastMapMatchConfig
-
-# Create network programmatically
-network = Network()
-
-# Add edges with geometries
-for edge_id, edge_data in your_edges.items():
-    geom = fastmm.LineString()
-    for x, y in edge_data['coordinates']:
-        geom.add_point(fastmm.Point(x, y))
-    network.add_edge(edge_id, source_node, target_node, geom)
-
-# Build spatial index
-network.build_rtree_index()
-
-# Configure and run matching
-config = FastMapMatchConfig(gps_error=5.0, radius=50.0)
-matcher = MapMatcher(network, config)
-
-# Match trajectory with automatic handling of errors
-result = matcher.match_gps(trajectory_df, timestamps_col='timestamp')
-```
-
-See `example_matching.py` for complete examples.
 
 ## TODO
 
 - Bring in extra python code.
-- check tests work.
-- Set up builds so boost etc. is bundled into whl, and cibuildwheel for linux/mac/windows.
+- Get test working in python.
 - If not found in UBODT, instead of bailing, do a normal djikstra lookup.
 - Need to check reverse tolerance - on our edges, they're all directed, so we probably shouldn't allow reversing. This causes errors when we're parsing - if you reverse on the same edge, the geometry gets flipped (I think - line = ALGORITHM::cutoffseg_unique(e0.geom, start_offset, end_offset); goes backward?), which then messes with our python post-processing of associating time as the segment start/stop are now the edge stop/start, not the other way round. We could add a reversed flag to the edge? That would help. For now, just don't have a reverse tolerance.
 - Could move the journey splitting (e.g. when unmatched candidate or points too far apart) into the C++ code here. Would be more optimal as a) C++, and b) don't need to repeat candidate lookup etc.
