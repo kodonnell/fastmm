@@ -44,7 +44,7 @@ Repository = "https://github.com/kodonnell/fastmm"
 
 [tool.scikit-build]
 # Scikit-build-core configuration for CMake integration
-cmake.verbose = true
+cmake.verbose = false
 cmake.build-type = "Release"
 install.components = ["python"]
 wheel.install-dir = "fastmm"

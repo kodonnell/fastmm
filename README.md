@@ -4,21 +4,22 @@ fastmm is a fast (C++) map-matching library for python with no dependencies, and
 
 It's based on a desire to map match a lot of vehicle trace data quickly, without the infrastructure to spin up OSRM / Valhalla. (And this is probably faster as there's no IPC ... ?)
 
-that's designed to be fast, can run on windows, and simpler than spinning up OSRM / Valhalla options.
-
 It is based on <https://github.com/cyang-kth/fmm> but updated to:
 
 - Remove GDAL/OGR dependencies - networks are created programmatically from Python
 - Include Python helper classes for automatic trajectory splitting and time interpolation
-- Be buildable on Windows with modern tooling
+- Be buildable on Windows/Linux/Mac with modern tooling
 - Focus on Python packaging with distributable wheels
+- Remove STMatch - we'll focus on FMM for now
 
 **Status:**
+
+- [ ] Tested ... = )
+- [ ] MapMatcher helper class with auto-splitting and time interpolation
 - [x] FASTMM algorithm working
 - [x] Python API for network creation and matching
-- [x] MapMatcher helper class with auto-splitting and time interpolation
 - [x] Windows, linux, and macOS wheel builds
-- [ ] STMatch removed (FMM is primary algorithm)
+
 
 ## Installation
 
@@ -34,6 +35,7 @@ pip install fastmm
 - Need to check reverse tolerance - on our edges, they're all directed, so we probably shouldn't allow reversing. This causes errors when we're parsing - if you reverse on the same edge, the geometry gets flipped (I think - line = ALGORITHM::cutoffseg_unique(e0.geom, start_offset, end_offset); goes backward?), which then messes with our python post-processing of associating time as the segment start/stop are now the edge stop/start, not the other way round. We could add a reversed flag to the edge? That would help. For now, just don't have a reverse tolerance.
 - Could move the journey splitting (e.g. when unmatched candidate or points too far apart) into the C++ code here. Would be more optimal as a) C++, and b) don't need to repeat candidate lookup etc.
 - Improve serialization of UBODT to be cross-platform.
+- Specify versions for build libs (e.g. cibuildwheel).
 
 ### Custom costs
 

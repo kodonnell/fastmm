@@ -33,7 +33,7 @@ setup(
     package_dir={"": "python"},
     # C++ extension is built by CMake and installed separately
     # This setup.py is for the Python wrapper code
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     # Optional dependencies for the MapMatcher helper
     extras_require={
         "matcher": [],
