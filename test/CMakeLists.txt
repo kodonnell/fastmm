@@ -11,7 +11,7 @@ add_executable(fastmm_test fastmm_test.cpp
         $<TARGET_OBJECTS:UTIL>
         $<TARGET_OBJECTS:IO>
         $<TARGET_OBJECTS:NETWORK>
-        $<TARGET_OBJECTS:FASTMM_OBJ>)
+        $<TARGET_OBJECTS:FMM_OBJ>)
 target_link_libraries(fastmm_test ${Boost_LIBRARIES}
         ${OpenMP_CXX_LIBRARIES} ${OSMIUM_LIBRARIES})
 

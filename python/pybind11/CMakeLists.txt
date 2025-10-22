@@ -59,10 +59,10 @@ install(TARGETS fastmm
 # RUNTIME for Windows (.dll), LIBRARY for Linux/macOS (.so/.dylib)
 message(STATUS "Configuring install for FASTMMLIB: $<TARGET_FILE:FASTMMLIB>")
 message(STATUS "FASTMMLIB will install RUNTIME to . and LIBRARY to . with component python")
-install(TARGETS FASTMMLIB
-    RUNTIME DESTINATION .
-    LIBRARY DESTINATION .
-    ARCHIVE DESTINATION .
+
+# Use generator expression to install the actual DLL file
+install(FILES $<TARGET_FILE:FASTMMLIB>
+    DESTINATION .
     COMPONENT python)
 
 # Install Python source files

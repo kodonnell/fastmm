@@ -110,11 +110,11 @@ add_library(ALGORITHM OBJECT ${AlgorithmGlob})
 add_library(UTIL OBJECT ${UtilGlob})
 add_library(NETWORK OBJECT ${NetworkGlob})
 add_library(MM_OBJ OBJECT ${MMGlob})
-add_library(FASTMM_OBJ OBJECT ${FMMGlob})
+add_library(FMM_OBJ OBJECT ${FMMGlob})
 
 add_library(FASTMMLIB SHARED
   $<TARGET_OBJECTS:MM_OBJ>
-  $<TARGET_OBJECTS:FASTMM_OBJ>
+  $<TARGET_OBJECTS:FMM_OBJ>
   $<TARGET_OBJECTS:CORE>
   $<TARGET_OBJECTS:ALGORITHM>
   $<TARGET_OBJECTS:UTIL>
@@ -123,12 +123,15 @@ add_library(FASTMMLIB SHARED
 # Set the output name to lowercase for consistency
 set_target_properties(FASTMMLIB PROPERTIES OUTPUT_NAME "fastmmlib")
 
-# Ensure FASTMMLIB DLL is in the same directory as the .pyd on Windows
+# On Windows, ensure DLL goes to the same location for all configurations
 if(WIN32)
-    set_target_properties(FASTMMLIB PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
-        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+    foreach(config ${CMAKE_CONFIGURATION_TYPES})
+        string(TOUPPER ${config} config_upper)
+        set_target_properties(FASTMMLIB PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY_${config_upper} "${CMAKE_BINARY_DIR}/${config}"
+            LIBRARY_OUTPUT_DIRECTORY_${config_upper} "${CMAKE_BINARY_DIR}/${config}"
+            ARCHIVE_OUTPUT_DIRECTORY_${config_upper} "${CMAKE_BINARY_DIR}/${config}")
+    endforeach()
 endif()
 
 message(STATUS "Installation folder ${CMAKE_INSTALL_PREFIX}")
