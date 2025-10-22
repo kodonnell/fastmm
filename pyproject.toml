@@ -85,10 +85,13 @@ repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel} --add-path C:/vc
 config-settings = { "cmake.define.CMAKE_GENERATOR" = "Visual Studio 17 2022" }
 
 [tool.cibuildwheel.linux]
-# CentOS 7 is EOL, need to use vault.centos.org mirrors
-before-build = "sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* && sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-* && yum install -y boost-devel cmake3"
+# Use manylinux_2_28 (AlmaLinux 8) instead of manylinux2014 (CentOS 7 EOL)
+before-build = "yum install -y boost-devel cmake"
 # Repair wheel to bundle external dependencies, exclude libfastmmlib.so which is already in the wheel
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} --exclude libfastmmlib.so"
+# Use newer manylinux image
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-i686-image = "manylinux_2_28"
 
 [tool.cibuildwheel.macos]
 before-build = "brew install boost cmake"
