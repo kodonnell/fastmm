@@ -123,8 +123,16 @@ add_library(FASTMMLIB SHARED
 # Set the output name to lowercase for consistency
 set_target_properties(FASTMMLIB PROPERTIES OUTPUT_NAME "fastmmlib")
 
+# Ensure FASTMMLIB DLL is in the same directory as the .pyd on Windows
+if(WIN32)
+    set_target_properties(FASTMMLIB PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+endif()
 
 message(STATUS "Installation folder ${CMAKE_INSTALL_PREFIX}")
+message(STATUS "FASTMMLIB target type: $<TARGET_PROPERTY:FASTMMLIB,TYPE>")
 
 # FASTMMLIB installation is handled in python/pybind11/CMakeLists.txt with the python component
 

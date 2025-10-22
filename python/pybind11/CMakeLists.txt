@@ -50,15 +50,19 @@ elseif(APPLE)
 endif()
 
 # Install Python extension (.pyd) - MODULE libraries use LIBRARY destination even on Windows
+message(STATUS "Configuring install for fastmm.pyd")
 install(TARGETS fastmm
     LIBRARY DESTINATION .
     COMPONENT python)
 
 # Install FASTMMLIB shared library
 # RUNTIME for Windows (.dll), LIBRARY for Linux/macOS (.so/.dylib)
+message(STATUS "Configuring install for FASTMMLIB: $<TARGET_FILE:FASTMMLIB>")
+message(STATUS "FASTMMLIB will install RUNTIME to . and LIBRARY to . with component python")
 install(TARGETS FASTMMLIB
     RUNTIME DESTINATION .
     LIBRARY DESTINATION .
+    ARCHIVE DESTINATION .
     COMPONENT python)
 
 # Install Python source files
