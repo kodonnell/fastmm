@@ -57,6 +57,40 @@ write_to = "python/fastmm/_version.py"
 version_scheme = "guess-next-dev"
 local_scheme = "no-local-version"
 
+[tool.cibuildwheel]
+# Build for Python 3.8-3.12
+build = "cp38-* cp39-* cp310-* cp311-* cp312-*"
+skip = "*-win32 *-musllinux_*"
+
+# Build verbosity
+build-verbosity = 1
+
+# Test the wheel after building
+test-command = "python -c \"import fastmm; print('fastmm version:', fastmm.__version__)\""
+
+[tool.cibuildwheel.windows]
+# Install Boost and build dependencies before building
+before-build = [
+    "if not exist \"C:\\vcpkg\\archives\" mkdir \"C:\\vcpkg\\archives\"",
+    "vcpkg install boost-geometry:x64-windows boost-serialization:x64-windows boost-format:x64-windows",
+    "pip install scikit-build-core setuptools-scm pybind11 delvewheel",
+]
+
+# Set Boost paths and vcpkg toolchain for CMake
+environment = { BOOST_ROOT = "C:/vcpkg/installed/x64-windows", CMAKE_ARGS = "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake", VCPKG_FEATURE_FLAGS = "binarycaching", VCPKG_DEFAULT_BINARY_CACHE = "C:/vcpkg/archives" }
+
+# Repair Windows wheels to bundle DLL dependencies
+repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel} --add-path C:/vcpkg/installed/x64-windows/bin --ignore-existing"
+
+# Use MSVC
+config-settings = { "cmake.define.CMAKE_GENERATOR" = "Visual Studio 17 2022" }
+
+[tool.cibuildwheel.linux]
+before-build = "yum install -y boost-devel cmake3 || apt-get update && apt-get install -y libboost-all-dev cmake"
+
+[tool.cibuildwheel.macos]
+before-build = "brew install boost cmake"
+
 [tool.ruff]
 line-length = 120
 target-version = "py38"
