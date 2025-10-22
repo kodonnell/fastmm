@@ -60,7 +60,7 @@ local_scheme = "no-local-version"
 [tool.cibuildwheel]
 # Build for Python 3.8-3.12
 build = "cp38-* cp39-* cp310-* cp311-* cp312-*"
-skip = "*-win32 *-musllinux_*"
+skip = "*-win32 *-musllinux_* *-manylinux_i686"
 
 # Build verbosity
 build-verbosity = 1
@@ -90,7 +90,6 @@ before-build = "yum install -y boost-devel cmake"
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} --exclude libfastmmlib.so"
 # Use newer manylinux image
 manylinux-x86_64-image = "manylinux_2_28"
-manylinux-i686-image = "manylinux_2_28"
 
 [tool.cibuildwheel.macos]
 before-build = "brew install boost cmake libomp"
