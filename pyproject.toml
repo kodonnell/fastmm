@@ -46,6 +46,9 @@ Repository = "https://github.com/kodonnell/fastmm"
 # Scikit-build-core configuration for CMake integration
 cmake.verbose = true
 cmake.build-type = "Release"
+# Enable parallel builds (uses all available CPU cores)
+# -j0 means use all cores (works with both Ninja and Make)
+build.tool-args = ["-j0"]
 install.components = ["python"]
 wheel.install-dir = "fastmm"
 
@@ -82,11 +85,13 @@ repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel} --add-path C:/vc
 config-settings = { "cmake.define.CMAKE_GENERATOR" = "Visual Studio 17 2022" }
 
 [tool.cibuildwheel.linux]
-before-build = "yum install -y boost-devel cmake3 || apt-get update && apt-get install -y libboost-all-dev cmake"
+before-build = "yum install -y boost-devel cmake3"
+# Repair wheel to bundle external dependencies, exclude libfastmmlib.so which is already in the wheel
+repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} --exclude libfastmmlib.so"
 
 [tool.cibuildwheel.macos]
 before-build = "brew install boost cmake"
 
 [tool.ruff]
 line-length = 120
-target-version = "py38"
+target-version = "py312"

@@ -4,8 +4,9 @@ cmake_minimum_required(VERSION 3.15)
 
 # Use modern Python discovery to match the interpreter cibuildwheel selected
 # This avoids mismatches like including Python 3.8 headers but linking against 3.13 libs
+# Use Development.Module instead of Development - only needs headers for extension modules
 set(PYBIND11_FINDPYTHON ON)
-find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module)
 
 # Add pybind11 (header-only)
 include(FetchContent)
@@ -35,14 +36,29 @@ target_link_libraries(fastmm PRIVATE ${FASTMM_LINK_LIBS})
 # Use C++14
 set_target_properties(fastmm PROPERTIES CXX_STANDARD 14)
 
+# Set RPATH so the extension can find libfastmmlib.so in the same directory
+if(UNIX AND NOT APPLE)
+    set_target_properties(fastmm PROPERTIES
+        BUILD_RPATH "$ORIGIN"
+        INSTALL_RPATH "$ORIGIN"
+    )
+elseif(APPLE)
+    set_target_properties(fastmm PROPERTIES
+        BUILD_RPATH "@loader_path"
+        INSTALL_RPATH "@loader_path"
+    )
+endif()
+
 # Install Python extension (.pyd) - MODULE libraries use LIBRARY destination even on Windows
 install(TARGETS fastmm
     LIBRARY DESTINATION .
     COMPONENT python)
 
-# Install FASTMMLIB.dll - RUNTIME for shared libraries on Windows
+# Install FASTMMLIB shared library
+# RUNTIME for Windows (.dll), LIBRARY for Linux/macOS (.so/.dylib)
 install(TARGETS FASTMMLIB
     RUNTIME DESTINATION .
+    LIBRARY DESTINATION .
     COMPONENT python)
 
 # Install Python source files

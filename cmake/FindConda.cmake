@@ -13,7 +13,7 @@ else()
 		execute_process(COMMAND ${CONDA_EXECUTABLE} info --envs
 				)
 	else()
-		message(STATUS "\nNo conda environment found in PATH!\nPATH=$ENV{PATH}\n")
+		message(STATUS "\nNo conda environment found in PATH.\nPATH=$ENV{PATH}\n")
 	endif()
   set(CONDA_PREFIX ${out_var})
 endif()
