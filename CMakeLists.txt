@@ -126,6 +126,6 @@ set_target_properties(FASTMMLIB PROPERTIES OUTPUT_NAME "fastmmlib")
 
 message(STATUS "Installation folder ${CMAKE_INSTALL_PREFIX}")
 
-install(TARGETS FASTMMLIB LIBRARY DESTINATION lib)
+# FASTMMLIB installation is handled in python/pybind11/CMakeLists.txt with the python component
 
 add_subdirectory(python/pybind11)
