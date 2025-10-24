@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     environment:
-      name: testpypi
+      name: pypi
       url: https://test.pypi.org/p/fastmm
     permissions:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
@@ -103,7 +103,7 @@ jobs:
 
   publish:
     name: Publish to PyPI
-    needs: [release] # ensure there's always a release for every publish
+    needs: [publish-test] # ensure there's always a release for every publish
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     environment:
