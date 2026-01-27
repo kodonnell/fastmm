@@ -389,6 +389,207 @@ class TestMatchResult:
                 assert hasattr(edge, "points")
 
 
+class TestSplitMatching:
+    """Test automatic trajectory splitting on failures."""
+
+    def test_split_match_basic(self):
+        """Test basic split matching with continuous trajectory."""
+        network = fastmm.Network()
+        network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
+        network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
+        network.build_rtree_index()
+
+        graph = fastmm.NetworkGraph(network)
+        cache_dir = Path("./.cache")
+        cache_dir.mkdir(exist_ok=True)
+        ubodt_path = cache_dir / "test_split.bin"
+
+        ubodt_gen = fastmm.UBODTGenAlgorithm(network, graph)
+        ubodt_gen.generate_ubodt(str(ubodt_path), delta=1000)
+        ubodt = fastmm.UBODT.read_ubodt_binary(str(ubodt_path), multiplier=5000)
+
+        matcher = fastmm.FastMapMatch(network, graph, ubodt)
+        config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=50, gps_error=50)
+
+        # Simple trajectory that should match completely
+        trajectory = fastmm.Trajectory.from_xy_tuples(1, [(10, 0), (50, 0), (150, 0)])
+        result = matcher.pymatch_trajectory_split(trajectory, config)
+
+        assert result.id == 1
+        assert len(result.subtrajectories) >= 1
+        # Should have at least one successful sub-trajectory
+        success_count = sum(1 for sub in result.subtrajectories if sub.error_code == fastmm.MatchErrorCode.SUCCESS)
+        assert success_count >= 1
+
+    def test_split_match_with_gap(self):
+        """Test split matching with a point far from network (simulates failure)."""
+        network = fastmm.Network()
+        network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
+        network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
+        network.build_rtree_index()
+
+        graph = fastmm.NetworkGraph(network)
+        cache_dir = Path("./.cache")
+        cache_dir.mkdir(exist_ok=True)
+        ubodt_path = cache_dir / "test_split_gap.bin"
+
+        ubodt_gen = fastmm.UBODTGenAlgorithm(network, graph)
+        ubodt_gen.generate_ubodt(str(ubodt_path), delta=1000)
+        ubodt = fastmm.UBODT.read_ubodt_binary(str(ubodt_path), multiplier=5000)
+
+        matcher = fastmm.FastMapMatch(network, graph, ubodt)
+        config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=30, gps_error=20)
+
+        # Trajectory with point far from network
+        trajectory = fastmm.Trajectory.from_xy_tuples(
+            1,
+            [
+                (10, 0),  # Point 0 - near network
+                (50, 0),  # Point 1 - near network
+                (100, 500),  # Point 2 - far from network (should be skipped)
+                (150, 0),  # Point 3 - near network
+                (180, 0),  # Point 4 - near network
+            ],
+        )
+        result = matcher.pymatch_trajectory_split(trajectory, config)
+
+        assert result.id == 1
+
+        # Should have successfully matched portions (points 0-1 and 3-4)
+        # Point 2 is just skipped (no single-point sub-trajectories added)
+        assert len(result.subtrajectories) >= 1
+
+        # All returned sub-trajectories should be successful
+        for sub in result.subtrajectories:
+            assert sub.error_code == fastmm.MatchErrorCode.SUCCESS
+
+        # Print results for debugging
+        print(f"\nSplit match result: {len(result.subtrajectories)} sub-trajectories")
+        for i, sub in enumerate(result.subtrajectories):
+            print(f"  Sub {i}: points [{sub.start_index}-{sub.end_index}] with {len(sub.segments)} segments")
+
+    def test_split_match_result_structure(self):
+        """Test the structure of split match results."""
+        network = fastmm.Network()
+        network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
+        network.build_rtree_index()
+
+        graph = fastmm.NetworkGraph(network)
+        cache_dir = Path("./.cache")
+        cache_dir.mkdir(exist_ok=True)
+        ubodt_path = cache_dir / "test_split_struct.bin"
+
+        ubodt_gen = fastmm.UBODTGenAlgorithm(network, graph)
+        ubodt_gen.generate_ubodt(str(ubodt_path), delta=1000)
+        ubodt = fastmm.UBODT.read_ubodt_binary(str(ubodt_path), multiplier=5000)
+
+        matcher = fastmm.FastMapMatch(network, graph, ubodt)
+        config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=50, gps_error=50)
+        trajectory = fastmm.Trajectory.from_xy_tuples(1, [(10, 0), (50, 0)])
+
+        result = matcher.pymatch_trajectory_split(trajectory, config)
+
+        # Check result structure
+        assert hasattr(result, "id")
+        assert hasattr(result, "subtrajectories")
+        assert isinstance(result.subtrajectories, list)
+
+        # Check sub-trajectory structure
+        for sub in result.subtrajectories:
+            assert hasattr(sub, "start_index")
+            assert hasattr(sub, "end_index")
+            assert hasattr(sub, "error_code")
+            assert hasattr(sub, "segments")
+            assert isinstance(sub.segments, list)
+
+            # All returned sub-trajectories should be successful
+            assert sub.error_code == fastmm.MatchErrorCode.SUCCESS
+
+            # For 2+ points, should have at least 1 segment
+            if sub.end_index > sub.start_index:
+                assert len(sub.segments) >= 1
+
+    def test_split_match_disconnected_by_distance(self):
+        """Test split matching when points are too far apart for UBODT (disconnected layers)."""
+        # Create a long network
+        network = fastmm.Network()
+        network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
+        network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
+        network.add_edge(3, source=3, target=4, geom=[(200, 0), (300, 0)])
+        network.add_edge(4, source=4, target=5, geom=[(300, 0), (400, 0)])
+        network.add_edge(5, source=5, target=6, geom=[(400, 0), (500, 0)])
+        network.add_edge(6, source=6, target=7, geom=[(500, 0), (600, 0)])
+        network.add_edge(7, source=7, target=8, geom=[(600, 0), (700, 0)])
+        network.add_edge(8, source=8, target=9, geom=[(700, 0), (800, 0)])
+        network.build_rtree_index()
+
+        graph = fastmm.NetworkGraph(network)
+        cache_dir = Path("./.cache")
+        cache_dir.mkdir(exist_ok=True)
+
+        # Use a specific delta value for this test
+        delta = 250
+        ubodt_path = cache_dir / f"test_split_disconnected_delta{delta}.bin"
+
+        # Delete old UBODT if it exists to ensure fresh generation
+        if ubodt_path.exists():
+            ubodt_path.unlink()
+
+        # Use delta=250 so paths requiring >250 units won't be in UBODT
+        ubodt_gen = fastmm.UBODTGenAlgorithm(network, graph)
+        ubodt_gen.generate_ubodt(str(ubodt_path), delta=delta)
+        ubodt = fastmm.UBODT.read_ubodt_binary(str(ubodt_path), multiplier=1000)
+
+        matcher = fastmm.FastMapMatch(network, graph, ubodt)
+        # Use k=1 and small radius to ensure we get the closest edge only
+        config = fastmm.FastMapMatchConfig(k=1, candidate_search_radius=30, gps_error=50)
+
+        # First, test with regular matching to see what happens
+        test_traj = fastmm.Trajectory.from_xy_tuples(
+            0,
+            [
+                (150, 0),  # Point on edge 2 (middle of 100-200)
+                (750, 0),  # Point on edge 8 (middle of 700-800) - very far away
+            ],
+        )
+        test_result = matcher.pymatch_trajectory(test_traj, config)
+        print(f"\nRegular match result (should fail with DISCONNECTED_LAYERS): {test_result.error_code}")
+
+        # Create trajectory with points that:
+        # - All have candidates (near roads)
+        # - But some consecutive points are beyond UBODT delta distance
+        trajectory = fastmm.Trajectory.from_xy_tuples(
+            1,
+            [
+                (50, 0),  # Point 0 - on edge 1 (middle of 0-100)
+                (150, 0),  # Point 1 - on edge 2 (middle of 100-200)
+                (750, 0),  # Point 2 - on edge 8 (middle of 700-800) - path requires >500 units
+                (780, 0),  # Point 3 - also on edge 8
+            ],
+        )
+        result = matcher.pymatch_trajectory_split(trajectory, config)
+
+        assert result.id == 1
+
+        # Should split into at least 2 sub-trajectories due to disconnection
+        # Point 1 (edge 2) to Point 2 (edge 7) requires path distance of ~400-500 units
+        # which exceeds delta=250, so UBODT won't have this path precomputed
+        # Expected: Points 0-1 match, then disconnect at 1->2, then points 2-3 match
+        assert len(result.subtrajectories) >= 2
+
+        # All returned sub-trajectories should be successful
+        for sub in result.subtrajectories:
+            assert sub.error_code == fastmm.MatchErrorCode.SUCCESS
+
+        # Print results for debugging
+        print(f"\nDisconnected layers test: {len(result.subtrajectories)} sub-trajectories")
+        for i, sub in enumerate(result.subtrajectories):
+            num_points = sub.end_index - sub.start_index + 1
+            print(
+                f"  Sub {i}: points [{sub.start_index}-{sub.end_index}] ({num_points} points) with {len(sub.segments)} segments"
+            )
+
+
 if __name__ == "__main__":
     # Allow running without pytest
     print("Running tests...")

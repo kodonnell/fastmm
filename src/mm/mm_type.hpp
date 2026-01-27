@@ -130,6 +130,26 @@ namespace FASTMM
       std::vector<PyMatchSegment> segments;         /**< A vector of matched segments */
     };
 
+    /**
+     * A continuous sub-trajectory match result (portion of trajectory that could be matched)
+     */
+    struct PySubTrajectory
+    {
+      int start_index;                      /**< Starting trajectory point index (inclusive) */
+      int end_index;                        /**< Ending trajectory point index (inclusive) */
+      MatchErrorCode error_code;            /**< SUCCESS if matched, or reason for failure */
+      std::vector<PyMatchSegment> segments; /**< Matched segments (only populated if error_code == SUCCESS) */
+    };
+
+    /**
+     * Result of matching with automatic trajectory splitting
+     */
+    struct PySplitMatchResult
+    {
+      int id;                                       /**< id of the trajectory */
+      std::vector<PySubTrajectory> subtrajectories; /**< List of sub-trajectory matches (both successful and failed) */
+    };
+
   };
 
 };

@@ -412,7 +412,88 @@ PYBIND11_MODULE(fastmm, m)
             Note:
                 The config's transition_mode must match the mode used to create the
                 NetworkGraph and UBODT. For FASTEST mode, ensure reference_speed is set.
+        )pbdoc")
+        .def("pymatch_trajectory_split", &FastMapMatch::pymatch_trajectory_split,
+             py::arg("trajectory"), py::arg("config"),
+             R"pbdoc(
+            Match a GPS trajectory with automatic splitting on failures.
+
+            This method performs candidate search once and reuses it when matching
+            sub-trajectories, providing better performance than repeatedly calling
+            pymatch_trajectory() on split segments. When the matching algorithm
+            encounters failures (no candidates, disconnected layers), it automatically
+            continues matching from the next viable point instead of stopping.
+
+            Args:
+                trajectory: Trajectory with GPS observations (with or without timestamps)
+                config: FastMapMatchConfig with matching parameters
+
+            Returns:
+                PySplitMatchResult containing a list of sub-trajectories, each marked
+                as either successfully matched (with segments) or failed (with error code)
+
+            Example:
+                Trajectory with points [0,1,2,3,4,5,6,7] where point 4 has no candidates:
+                - Returns 2 sub-trajectories: [0-3] SUCCESS, [4-4] CANDIDATES_NOT_FOUND
+                - If points 5-7 can be matched, adds [5-7] SUCCESS
+                - Much faster than calling pymatch_trajectory() multiple times since
+                  candidate lookup is done once
+
+            Note:
+                The config's transition_mode must match the mode used to create the
+                NetworkGraph and UBODT. For FASTEST mode, ensure reference_speed is set.
         )pbdoc");
+
+    // PySubTrajectory struct
+    py::class_<PySubTrajectory>(m, "PySubTrajectory", R"pbdoc(
+        A continuous portion of a trajectory that was matched or failed.
+
+        Represents a successful match with segments. Failed portions are simply
+        excluded from the results - only successfully matched sub-trajectories
+        are returned in the PySplitMatchResult.
+    )pbdoc")
+        .def_readonly("start_index", &PySubTrajectory::start_index,
+                      "Starting trajectory point index (inclusive)")
+        .def_readonly("end_index", &PySubTrajectory::end_index,
+                      "Ending trajectory point index (inclusive)")
+        .def_readonly("error_code", &PySubTrajectory::error_code,
+                      "MatchErrorCode: SUCCESS if matched, or failure reason (informational)")
+        .def_readonly("segments", &PySubTrajectory::segments,
+                      "List of PyMatchSegment objects (only populated if error_code == SUCCESS)")
+        .def("__repr__", [](const PySubTrajectory &s)
+             {
+                 std::string status = (s.error_code == MatchErrorCode::SUCCESS) ? "SUCCESS" : "FAILED";
+                 return "<SubTraj [" + std::to_string(s.start_index) + "-" +
+                        std::to_string(s.end_index) + "] " + status +
+                        " with " + std::to_string(s.segments.size()) + " segments>"; });
+
+    // PySplitMatchResult struct
+    py::class_<PySplitMatchResult>(m, "PySplitMatchResult", R"pbdoc(
+        Result of matching with automatic trajectory splitting.
+
+        Contains a list of sub-trajectories representing all continuous matched
+        portions and failed sections of the input trajectory. Each sub-trajectory
+        indicates which points it covers and whether matching succeeded or failed.
+    )pbdoc")
+        .def_readonly("id", &PySplitMatchResult::id,
+                      "Trajectory ID (copied from input Trajectory)")
+        .def_readonly("subtrajectories", &PySplitMatchResult::subtrajectories,
+                      "List of PySubTrajectory objects (both successful and failed portions)")
+        .def("__repr__", [](const PySplitMatchResult &r)
+             {
+                 int success_count = 0;
+                 int failed_count = 0;
+                 for (const auto &sub : r.subtrajectories) {
+                     if (sub.error_code == MatchErrorCode::SUCCESS) {
+                         success_count++;
+                     } else {
+                         failed_count++;
+                     }
+                 }
+                 return "<SplitMatch id=" + std::to_string(r.id) +
+                        " total_subs=" + std::to_string(r.subtrajectories.size()) +
+                        " success=" + std::to_string(success_count) +
+                        " failed=" + std::to_string(failed_count) + ">"; });
 
     // Trajectory struct
     py::class_<Trajectory>(m, "Trajectory", R"pbdoc(

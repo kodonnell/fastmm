@@ -94,6 +94,15 @@ namespace FASTMM
        */
       PyMatchResult pymatch_trajectory(const CORE::Trajectory &trajectory,
                                        const FastMapMatchConfig &config);
+      /**
+       * Match a trajectory with automatic splitting on failures
+       * Performs candidate search once and reuses it for all sub-trajectories
+       * @param  trajectory   input trajectory data
+       * @param  config configuration of map matching algorithm
+       * @return split match result containing all successful and failed sub-trajectories
+       */
+      PySplitMatchResult pymatch_trajectory_split(const CORE::Trajectory &trajectory,
+                                                  const FastMapMatchConfig &config);
 
     protected:
       /**
@@ -141,6 +150,23 @@ namespace FASTMM
                         double euclidean_distance,
                         const FastMapMatchConfig &config,
                         bool *connected);
+      /**
+       * Build PyMatchSegment objects from matched path
+       * Helper function for building segment output, extracted to avoid duplication
+       * @param matched_path matched candidate path
+       * @param complete_path complete edge path
+       * @param indices indices mapping
+       * @param trajectory original trajectory
+       * @param start_idx starting trajectory index
+       * @param end_idx ending trajectory index
+       * @return vector of PyMatchSegment objects
+       */
+      std::vector<PyMatchSegment> build_py_segments(const MatchedCandidatePath &matched_path,
+                                                    const CompletePath &complete_path,
+                                                    const std::vector<int> &indices,
+                                                    const CORE::Trajectory &trajectory,
+                                                    int start_idx,
+                                                    int end_idx);
 
     private:
       const NETWORK::Network &network_;

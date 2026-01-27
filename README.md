@@ -1,6 +1,6 @@
 # fastmm
 
-fastmm is a fast (C++) map-matching library for python with no dependencies, and the ability to interpolate time on the match, not just position.
+fastmm is a fast (C++) map-matching library for python with no dependencies, and the ability to interpolate time on the match (not just position), and also match as much as possible of the GPS trace (not just fail if a single point is wonky).
 
 It's based on a desire to map match a lot of vehicle trace data quickly, without the infrastructure to spin up OSRM / Valhalla. (And this is probably faster as there's no IPC ... ?)
 
@@ -14,8 +14,8 @@ It is based on <https://github.com/cyang-kth/fmm> but updated to:
 
 **Status:**
 
-- [ ] Tested ... = )
-- [ ] MapMatcher helper class with auto-splitting and time interpolation
+- [x] Tested ... = )
+- [x] MapMatcher helper class with auto-splitting and time interpolation
 - [x] FASTMM algorithm working
 - [x] Python API for network creation and matching
 - [x] Windows, linux, and macOS wheel builds
@@ -27,14 +27,81 @@ It is based on <https://github.com/cyang-kth/fmm> but updated to:
 pip install fastmm
 ```
 
+## Usage
+
+### Basic Map Matching
+
+```python
+import fastmm
+
+# Create network
+network = fastmm.Network()
+network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
+network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
+network.build_rtree_index()
+
+# Build routing graph and UBODT
+graph = fastmm.NetworkGraph(network)
+ubodt_gen = fastmm.UBODTGenAlgorithm(network, graph)
+ubodt_gen.generate_ubodt("ubodt.bin", delta=1000)
+ubodt = fastmm.UBODT.read_ubodt_binary("ubodt.bin", multiplier=50000)
+
+# Create matcher and config
+matcher = fastmm.FastMapMatch(network, graph, ubodt)
+config = fastmm.FastMapMatchConfig(k=8, candidate_search_radius=50, gps_error=50)
+
+# Match a trajectory
+trajectory = fastmm.Trajectory.from_xy_tuples(1, [(10, 0), (50, 0), (150, 0)])
+result = matcher.pymatch_trajectory(trajectory, config)
+
+if result.error_code == fastmm.MatchErrorCode.SUCCESS:
+    for segment in result.segments:
+        print(f"Segment from {segment.p0} to {segment.p1}")
+        for edge in segment.edges:
+            print(f"  Edge {edge.edge_id} with {len(edge.points)} points")
+```
+
+### Automatic Trajectory Splitting
+
+For trajectories that might have gaps or failures, use `pymatch_trajectory_split()` which automatically handles:
+- Points with no nearby road candidates (e.g., in tunnels, off-network)
+- Disconnected route segments (e.g., GPS jumps, teleportation)
+- Returns only the successfully matched portions
+
+```python
+# Same network/matcher setup as above...
+
+# Match with automatic splitting
+trajectory = fastmm.Trajectory.from_xy_tuples(1, [
+    (10, 0),    # Point 0
+    (50, 0),    # Point 1
+    (100, 500), # Point 2 - far from network, will be skipped
+    (150, 0),   # Point 3
+    (180, 0),   # Point 4
+])
+result = matcher.pymatch_trajectory_split(trajectory, config)
+
+# Process successful sub-trajectories
+for sub in result.subtrajectories:
+    print(f"Matched points {sub.start_index} to {sub.end_index}")
+    for segment in sub.segments:
+        print(f"  Segment with {len(segment.edges)} edges")
+```
+
+**Benefits of split matching:**
+- **Performance**: Candidate search done once for all points, then reused across sub-trajectories
+- **Automatic recovery**: Continues matching after failures instead of giving up
+- **Simplicity**: No manual trajectory splitting or error handling needed
+
 ## TODO
 
+- what is delta for ubodt FASTEST?
+- Can we auto-compute multiplier? Can we hide UBODT completely from user?
 - Ensure UBODT mode matches network when loaded. Improve serialization of UBODT to be cross-platform.
 - Bring in extra python code.
 - Get test working in python.
 - If not found in UBODT, instead of bailing, do a normal djikstra lookup.
 - Need to check reverse tolerance - on our edges, they're all directed, so we probably shouldn't allow reversing. This causes errors when we're parsing - if you reverse on the same edge, the geometry gets flipped (I think - line = ALGORITHM::cutoffseg_unique(e0.geom, start_offset, end_offset); goes backward?), which then messes with our python post-processing of associating time as the segment start/stop are now the edge stop/start, not the other way round. We could add a reversed flag to the edge? That would help. For now, just don't have a reverse tolerance.
-- Could move the journey splitting (e.g. when unmatched candidate or points too far apart) into the C++ code here. Would be more optimal as a) C++, and b) don't need to repeat candidate lookup etc.
 - Specify versions for build libs (e.g. cibuildwheel).
 
 ## Routing Modes: SHORTEST vs FASTEST

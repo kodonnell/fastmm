@@ -30,7 +30,11 @@ __all__ = [
     "PyMatchCandidate",
     "PyMatchPoint",
     "PyMatchSegmentEdge",
+    "PySubTrajectory",
+    "PySplitMatchResult",
     "MatchErrorCode",
+    # Enums
+    "TransitionMode",
     # Python helpers
     "MapMatcher",
 ]

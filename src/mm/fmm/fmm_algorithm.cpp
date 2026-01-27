@@ -25,380 +25,692 @@ FastMapMatchConfig::FastMapMatchConfig(int k_arg,
       transition_mode(transition_mode),
       reference_speed(reference_speed)
 {
-  // Validation
-  if (transition_mode == TransitionMode::FASTEST && !reference_speed.has_value())
-  {
-    throw std::invalid_argument("Reference speed is required for FASTEST mode");
-  }
-  if (reference_speed.has_value() && reference_speed.value() <= 0)
-  {
-    throw std::invalid_argument("Reference speed must be positive");
-  }
+    // Validation
+    if (transition_mode == TransitionMode::FASTEST && !reference_speed.has_value())
+    {
+        throw std::invalid_argument("Reference speed is required for FASTEST mode");
+    }
+    if (reference_speed.has_value() && reference_speed.value() <= 0)
+    {
+        throw std::invalid_argument("Reference speed must be positive");
+    }
 };
 
 MatchResult FastMapMatch::match_trajectory(const Trajectory &trajectory, const FastMapMatchConfig &config)
 {
-  SPDLOG_DEBUG("Count of points in trajectory {}", trajectory.geom.get_num_points());
-  SPDLOG_DEBUG("Search candidates");
-  TrajectoryCandidates tc = network_.search_tr_cs_knn(trajectory.geom, config.k, config.candidate_search_radius);
-  SPDLOG_DEBUG("Trajectory candidate {}", tc);
-  MatchResult result = MatchResult{};
-  result.id = trajectory.id;
-  result.error_code = MatchErrorCode::UNKNOWN_ERROR;
-  std::vector<int> unmatched_indices;
-  for (int i = 0; i < tc.size(); ++i)
-  {
-    if (tc[i].empty())
+    SPDLOG_DEBUG("Count of points in trajectory {}", trajectory.geom.get_num_points());
+    SPDLOG_DEBUG("Search candidates");
+    TrajectoryCandidates tc = network_.search_tr_cs_knn(trajectory.geom, config.k, config.candidate_search_radius);
+    SPDLOG_DEBUG("Trajectory candidate {}", tc);
+    MatchResult result = MatchResult{};
+    result.id = trajectory.id;
+    result.error_code = MatchErrorCode::UNKNOWN_ERROR;
+    std::vector<int> unmatched_indices;
+    for (int i = 0; i < tc.size(); ++i)
     {
-      unmatched_indices.push_back(i);
+        if (tc[i].empty())
+        {
+            unmatched_indices.push_back(i);
+        }
     }
-  }
 
-  if (!unmatched_indices.empty())
-  {
-    SPDLOG_DEBUG("No candidates found for trajectory {} at points {}", trajectory.id, unmatched_indices);
-    result.error_code = MatchErrorCode::CANDIDATES_NOT_FOUND;
-    result.unmatched_candidate_indices = unmatched_indices;
+    if (!unmatched_indices.empty())
+    {
+        SPDLOG_DEBUG("No candidates found for trajectory {} at points {}", trajectory.id, unmatched_indices);
+        result.error_code = MatchErrorCode::CANDIDATES_NOT_FOUND;
+        result.unmatched_candidate_indices = unmatched_indices;
+        return result;
+    }
+
+    SPDLOG_DEBUG("Generate transition graph");
+    TransitionGraph tg(tc, config.gps_error);
+    SPDLOG_DEBUG("Update cost in transition graph");
+    // The network will be used internally to update transition graph
+    bool all_connected = false;
+    int last_connected = update_tg(&tg, trajectory, config, &all_connected);
+    if (!all_connected)
+    {
+        SPDLOG_DEBUG("Traj {} unmatched at trajectory point {}", trajectory.id, last_connected);
+        result.last_connected_trajectory_point = last_connected;
+        result.error_code = MatchErrorCode::DISCONNECTED_LAYERS;
+        return result;
+    }
+    SPDLOG_DEBUG("Optimal path inference");
+    TGOpath tg_opath = tg.backtrack();
+    SPDLOG_DEBUG("Optimal path size {}", tg_opath.size());
+    MatchedCandidatePath matched_candidate_path(tg_opath.size());
+    std::transform(tg_opath.begin(), tg_opath.end(), matched_candidate_path.begin(), [](const TGNode *a)
+                   { return MatchedCandidate{
+                         *(a->c), a->ep, a->tp, a->shortest_path_distance}; });
+    OptimalPath optimal_path(tg_opath.size());
+    std::transform(tg_opath.begin(), tg_opath.end(), optimal_path.begin(), [](const TGNode *a)
+                   { return a->c->edge->id; });
+    std::vector<int> indices;
+    const std::vector<Edge> &edges = network_.get_edges();
+    CompletePath complete_path = ubodt_->construct_complete_path(trajectory.id, tg_opath, edges, &indices, config.reverse_tolerance);
+    SPDLOG_DEBUG("Opath is {}", optimal_path);
+    SPDLOG_DEBUG("Indices is {}", indices);
+    SPDLOG_DEBUG("Complete path is {}", complete_path);
+    LineString matched_geometry = network_.complete_path_to_geometry(trajectory.geom, complete_path);
+
+    result.error_code = MatchErrorCode::SUCCESS;
+    result.opt_candidate_path = matched_candidate_path;
+    result.optimal_path = optimal_path;
+    result.complete_path = complete_path;
+    result.indices = indices;
+    result.matched_geometry = matched_geometry;
     return result;
-  }
-
-  SPDLOG_DEBUG("Generate transition graph");
-  TransitionGraph tg(tc, config.gps_error);
-  SPDLOG_DEBUG("Update cost in transition graph");
-  // The network will be used internally to update transition graph
-  bool all_connected = false;
-  int last_connected = update_tg(&tg, trajectory, config, &all_connected);
-  if (!all_connected)
-  {
-    SPDLOG_DEBUG("Traj {} unmatched at trajectory point {}", trajectory.id, last_connected);
-    result.last_connected_trajectory_point = last_connected;
-    result.error_code = MatchErrorCode::DISCONNECTED_LAYERS;
-    return result;
-  }
-  SPDLOG_DEBUG("Optimal path inference");
-  TGOpath tg_opath = tg.backtrack();
-  SPDLOG_DEBUG("Optimal path size {}", tg_opath.size());
-  MatchedCandidatePath matched_candidate_path(tg_opath.size());
-  std::transform(tg_opath.begin(), tg_opath.end(), matched_candidate_path.begin(), [](const TGNode *a)
-                 { return MatchedCandidate{
-                       *(a->c), a->ep, a->tp, a->shortest_path_distance}; });
-  OptimalPath optimal_path(tg_opath.size());
-  std::transform(tg_opath.begin(), tg_opath.end(), optimal_path.begin(), [](const TGNode *a)
-                 { return a->c->edge->id; });
-  std::vector<int> indices;
-  const std::vector<Edge> &edges = network_.get_edges();
-  CompletePath complete_path = ubodt_->construct_complete_path(trajectory.id, tg_opath, edges, &indices, config.reverse_tolerance);
-  SPDLOG_DEBUG("Opath is {}", optimal_path);
-  SPDLOG_DEBUG("Indices is {}", indices);
-  SPDLOG_DEBUG("Complete path is {}", complete_path);
-  LineString matched_geometry = network_.complete_path_to_geometry(trajectory.geom, complete_path);
-
-  result.error_code = MatchErrorCode::SUCCESS;
-  result.opt_candidate_path = matched_candidate_path;
-  result.optimal_path = optimal_path;
-  result.complete_path = complete_path;
-  result.indices = indices;
-  result.matched_geometry = matched_geometry;
-  return result;
 }
 
 PyMatchResult FastMapMatch::pymatch_trajectory(const CORE::Trajectory &trajectory,
                                                const FastMapMatchConfig &config)
 {
-  MatchResult result = match_trajectory(trajectory, config);
-  PyMatchResult output;
-  output.id = result.id;
-  output.error_code = result.error_code;
-  output.last_connected_trajectory_point = result.last_connected_trajectory_point;
-  output.unmatched_candidate_indices = result.unmatched_candidate_indices;
-  output.segments = std::vector<PyMatchSegment>{};
-  FASTMM::MM::CompletePath edge_ids = result.complete_path;
+    MatchResult result = match_trajectory(trajectory, config);
+    PyMatchResult output;
+    output.id = result.id;
+    output.error_code = result.error_code;
+    output.last_connected_trajectory_point = result.last_connected_trajectory_point;
+    output.unmatched_candidate_indices = result.unmatched_candidate_indices;
+    output.segments = std::vector<PyMatchSegment>{};
+    FASTMM::MM::CompletePath edge_ids = result.complete_path;
 
-  if (result.error_code != MatchErrorCode::SUCCESS)
-  {
+    if (result.error_code != MatchErrorCode::SUCCESS)
+    {
+        return output;
+    }
+
+    // For each of the candidate points, get the segment from p0 to p1, and the edges in between:
+    double cumulative_distance = 0;
+    for (int i = 1; i < result.opt_candidate_path.size(); ++i)
+    {
+        const MatchedCandidate &mc0 = result.opt_candidate_path[i - 1];
+        const MatchedCandidate &mc1 = result.opt_candidate_path[i];
+        // Get the first edge, and add the segment from the match point to the end of the edge:
+        const int start_edge_index = result.indices[i - 1];
+        const int end_edge_index = result.indices[i];
+        if (start_edge_index < 0 || start_edge_index >= edge_ids.size())
+        {
+            SPDLOG_WARN("Start edge index {} out of bounds [0, {})", start_edge_index, edge_ids.size());
+            output.error_code = MatchErrorCode::INDEX_OUT_OF_BOUNDS;
+            return output;
+        }
+        if (end_edge_index < 0 || end_edge_index >= edge_ids.size())
+        {
+            SPDLOG_WARN("End edge index {} out of bounds [0, {})", end_edge_index, edge_ids.size());
+            output.error_code = MatchErrorCode::INDEX_OUT_OF_BOUNDS_END;
+            return output;
+        }
+
+        const PyMatchCandidate start_candidate = {
+            boost::geometry::get<0>(mc0.c.point),
+            boost::geometry::get<1>(mc0.c.point),
+            trajectory.timestamps.empty() ? 0.0 : trajectory.timestamps[i - 1],
+            mc0.c.dist,
+            mc0.c.offset};
+        const PyMatchCandidate end_candidate = {
+            boost::geometry::get<0>(mc1.c.point),
+            boost::geometry::get<1>(mc1.c.point),
+            trajectory.timestamps.empty() ? 0.0 : trajectory.timestamps[i],
+            mc1.c.dist,
+            mc1.c.offset};
+        double start_offset, end_offset, start_distance;
+        FASTMM::CORE::LineString line;
+        std::vector<PyMatchPoint> points;
+        PyMatchSegment segment = {start_candidate, end_candidate, {}};
+        std::vector<double> distances;
+        EdgeID edge_id;
+        if (start_edge_index == end_edge_index)
+        {
+            // OK, this segment is just one edge:
+            edge_id = result.complete_path[start_edge_index];
+            const Edge &e0 = network_.get_edge(edge_id);
+            start_offset = mc0.c.offset;
+            end_offset = mc1.c.offset;
+            line = ALGORITHM::cutoffseg_unique(e0.geom, start_offset, end_offset);
+            points.clear();
+            distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
+            start_distance = cumulative_distance;
+            for (int j = 0; j < line.get_num_points(); ++j)
+            {
+                if (j > 0)
+                {
+                    cumulative_distance += distances[j - 1];
+                }
+                points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
+            }
+            const PyMatchSegmentEdge segmentEdge = {edge_id, points};
+            segment.edges.push_back(segmentEdge);
+        }
+        else
+        {
+            // OK, multiple segments.
+
+            // First, the segment from the start point to the end of the first edge:
+            edge_id = result.complete_path[start_edge_index];
+            const Edge &e0 = network_.get_edge(edge_id);
+            start_offset = mc0.c.offset;
+            line = ALGORITHM::cutoffseg_unique(e0.geom, start_offset, e0.length);
+            points.clear();
+            distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
+            start_distance = cumulative_distance;
+            for (int j = 0; j < line.get_num_points(); ++j)
+            {
+                if (j > 0)
+                {
+                    cumulative_distance += distances[j - 1];
+                }
+                points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
+            }
+            segment.edges.push_back({edge_id, points});
+
+            // Next, all the full edges in between:
+            for (int j = start_edge_index + 1; j < end_edge_index; ++j)
+            {
+                edge_id = result.complete_path[j];
+                line = network_.get_edge(edge_id).geom;
+                distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
+                points.clear();
+                start_distance = cumulative_distance;
+                for (int k = 0; k < line.get_num_points(); ++k)
+                {
+                    if (k > 0)
+                    {
+                        cumulative_distance += distances[k - 1];
+                    }
+                    points.push_back({line.get_x(k), line.get_y(k), cumulative_distance - start_distance, cumulative_distance});
+                }
+                segment.edges.push_back({edge_id, points});
+            }
+            // Finally, the segment from the start of the last edge to the end point:
+            edge_id = result.complete_path[end_edge_index];
+            const Edge &e1 = network_.get_edge(edge_id);
+            start_offset = 0;
+            end_offset = mc1.c.offset;
+            line = ALGORITHM::cutoffseg_unique(e1.geom, start_offset, end_offset);
+            distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
+            start_distance = cumulative_distance;
+            points.clear();
+            for (int j = 0; j < line.get_num_points(); ++j)
+            {
+                if (j > 0)
+                {
+                    cumulative_distance += distances[j - 1];
+                }
+                points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
+            }
+            segment.edges.push_back({edge_id, points});
+        }
+
+        // Done!
+        output.segments.push_back(segment);
+    }
+    output.error_code = MatchErrorCode::SUCCESS;
     return output;
-  }
-
-  // For each of the candidate points, get the segment from p0 to p1, and the edges in between:
-  double cumulative_distance = 0;
-  for (int i = 1; i < result.opt_candidate_path.size(); ++i)
-  {
-    const MatchedCandidate &mc0 = result.opt_candidate_path[i - 1];
-    const MatchedCandidate &mc1 = result.opt_candidate_path[i];
-    // Get the first edge, and add the segment from the match point to the end of the edge:
-    const int start_edge_index = result.indices[i - 1];
-    const int end_edge_index = result.indices[i];
-    if (start_edge_index < 0 || start_edge_index >= edge_ids.size())
-    {
-      SPDLOG_WARN("Start edge index {} out of bounds [0, {})", start_edge_index, edge_ids.size());
-      output.error_code = MatchErrorCode::INDEX_OUT_OF_BOUNDS;
-      return output;
-    }
-    if (end_edge_index < 0 || end_edge_index >= edge_ids.size())
-    {
-      SPDLOG_WARN("End edge index {} out of bounds [0, {})", end_edge_index, edge_ids.size());
-      output.error_code = MatchErrorCode::INDEX_OUT_OF_BOUNDS_END;
-      return output;
-    }
-
-    const PyMatchCandidate start_candidate = {
-        boost::geometry::get<0>(mc0.c.point),
-        boost::geometry::get<1>(mc0.c.point),
-        trajectory.timestamps.empty() ? 0.0 : trajectory.timestamps[i - 1],
-        mc0.c.dist,
-        mc0.c.offset};
-    const PyMatchCandidate end_candidate = {
-        boost::geometry::get<0>(mc1.c.point),
-        boost::geometry::get<1>(mc1.c.point),
-        trajectory.timestamps.empty() ? 0.0 : trajectory.timestamps[i],
-        mc1.c.dist,
-        mc1.c.offset};
-    double start_offset, end_offset, start_distance;
-    FASTMM::CORE::LineString line;
-    std::vector<PyMatchPoint> points;
-    PyMatchSegment segment = {start_candidate, end_candidate, {}};
-    std::vector<double> distances;
-    EdgeID edge_id;
-    if (start_edge_index == end_edge_index)
-    {
-      // OK, this segment is just one edge:
-      edge_id = result.complete_path[start_edge_index];
-      const Edge &e0 = network_.get_edge(edge_id);
-      start_offset = mc0.c.offset;
-      end_offset = mc1.c.offset;
-      line = ALGORITHM::cutoffseg_unique(e0.geom, start_offset, end_offset);
-      points.clear();
-      distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
-      start_distance = cumulative_distance;
-      for (int j = 0; j < line.get_num_points(); ++j)
-      {
-        if (j > 0)
-        {
-          cumulative_distance += distances[j - 1];
-        }
-        points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
-      }
-      const PyMatchSegmentEdge segmentEdge = {edge_id, points};
-      segment.edges.push_back(segmentEdge);
-    }
-    else
-    {
-      // OK, multiple segments.
-
-      // First, the segment from the start point to the end of the first edge:
-      edge_id = result.complete_path[start_edge_index];
-      const Edge &e0 = network_.get_edge(edge_id);
-      start_offset = mc0.c.offset;
-      line = ALGORITHM::cutoffseg_unique(e0.geom, start_offset, e0.length);
-      points.clear();
-      distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
-      start_distance = cumulative_distance;
-      for (int j = 0; j < line.get_num_points(); ++j)
-      {
-        if (j > 0)
-        {
-          cumulative_distance += distances[j - 1];
-        }
-        points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
-      }
-      segment.edges.push_back({edge_id, points});
-
-      // Next, all the full edges in between:
-      for (int j = start_edge_index + 1; j < end_edge_index; ++j)
-      {
-        edge_id = result.complete_path[j];
-        line = network_.get_edge(edge_id).geom;
-        distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
-        points.clear();
-        start_distance = cumulative_distance;
-        for (int k = 0; k < line.get_num_points(); ++k)
-        {
-          if (k > 0)
-          {
-            cumulative_distance += distances[k - 1];
-          }
-          points.push_back({line.get_x(k), line.get_y(k), cumulative_distance - start_distance, cumulative_distance});
-        }
-        segment.edges.push_back({edge_id, points});
-      }
-      // Finally, the segment from the start of the last edge to the end point:
-      edge_id = result.complete_path[end_edge_index];
-      const Edge &e1 = network_.get_edge(edge_id);
-      start_offset = 0;
-      end_offset = mc1.c.offset;
-      line = ALGORITHM::cutoffseg_unique(e1.geom, start_offset, end_offset);
-      distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
-      start_distance = cumulative_distance;
-      points.clear();
-      for (int j = 0; j < line.get_num_points(); ++j)
-      {
-        if (j > 0)
-        {
-          cumulative_distance += distances[j - 1];
-        }
-        points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
-      }
-      segment.edges.push_back({edge_id, points});
-    }
-
-    // Done!
-    output.segments.push_back(segment);
-  }
-  output.error_code = MatchErrorCode::SUCCESS;
-  return output;
 }
 
 double FastMapMatch::get_distance(const Candidate *ca, const Candidate *cb, double reverse_tolerance)
 {
-  double distance = 0;
-  if (ca->edge->id == cb->edge->id && ca->offset <= cb->offset)
-  {
-    // Transition on the same edge, where b is after a i.e. not reversing.
-    distance = cb->offset - ca->offset;
-  }
-  else if (ca->edge->id == cb->edge->id && ca->offset - cb->offset < ca->edge->length * reverse_tolerance)
-  {
-    // Transition on the same edge, where b is before a but also within the reverse tolerance, then allow.
-    distance = 0;
-  }
-  else if (ca->edge->target == cb->edge->source)
-  {
-    // Transition on the same OD nodes
-    distance = ca->edge->length - ca->offset + cb->offset;
-  }
-  else
-  {
-    Record *r = ubodt_->look_up(ca->edge->target, cb->edge->source);
-    // No sp path exist from O to D.
-    if (r == nullptr)
-      return std::numeric_limits<double>::infinity();
-    // UBODT stores cost (distance for SHORTEST mode, time for FASTEST mode)
-    distance = r->cost + ca->edge->length - ca->offset + cb->offset;
-  }
-  return distance;
+    double distance = 0;
+    if (ca->edge->id == cb->edge->id && ca->offset <= cb->offset)
+    {
+        // Transition on the same edge, where b is after a i.e. not reversing.
+        distance = cb->offset - ca->offset;
+    }
+    else if (ca->edge->id == cb->edge->id && ca->offset - cb->offset < ca->edge->length * reverse_tolerance)
+    {
+        // Transition on the same edge, where b is before a but also within the reverse tolerance, then allow.
+        distance = 0;
+    }
+    else if (ca->edge->target == cb->edge->source)
+    {
+        // Transition on the same OD nodes
+        distance = ca->edge->length - ca->offset + cb->offset;
+    }
+    else
+    {
+        Record *r = ubodt_->look_up(ca->edge->target, cb->edge->source);
+        // No sp path exist from O to D.
+        if (r == nullptr)
+            return std::numeric_limits<double>::infinity();
+        // UBODT stores cost (distance for SHORTEST mode, time for FASTEST mode)
+        distance = r->cost + ca->edge->length - ca->offset + cb->offset;
+    }
+    return distance;
 }
 
 double FastMapMatch::get_time(const Candidate *ca, const Candidate *cb, double reverse_tolerance)
 {
-  double time = 0;
-  if (ca->edge->id == cb->edge->id && ca->offset <= cb->offset)
-  {
-    // Transition on the same edge
-    // Speed is guaranteed to exist since NetworkGraph constructor validates this in FASTEST mode
-    double segment_distance = cb->offset - ca->offset;
-    time = segment_distance / ca->edge->speed.value();
-  }
-  else if (ca->edge->id == cb->edge->id && ca->offset - cb->offset < ca->edge->length * reverse_tolerance)
-  {
-    // Reverse within tolerance
-    time = 0;
-  }
-  else if (ca->edge->target == cb->edge->source)
-  {
-    // Transition on adjacent edges
-    // Speed is guaranteed to exist since NetworkGraph constructor validates this in FASTEST mode
-    double ca_remaining = ca->edge->length - ca->offset;
-    double cb_initial = cb->offset;
+    double time = 0;
+    if (ca->edge->id == cb->edge->id && ca->offset <= cb->offset)
+    {
+        // Transition on the same edge
+        // Speed is guaranteed to exist since NetworkGraph constructor validates this in FASTEST mode
+        double segment_distance = cb->offset - ca->offset;
+        time = segment_distance / ca->edge->speed.value();
+    }
+    else if (ca->edge->id == cb->edge->id && ca->offset - cb->offset < ca->edge->length * reverse_tolerance)
+    {
+        // Reverse within tolerance
+        time = 0;
+    }
+    else if (ca->edge->target == cb->edge->source)
+    {
+        // Transition on adjacent edges
+        // Speed is guaranteed to exist since NetworkGraph constructor validates this in FASTEST mode
+        double ca_remaining = ca->edge->length - ca->offset;
+        double cb_initial = cb->offset;
 
-    double time_ca = ca_remaining / ca->edge->speed.value();
-    double time_cb = cb_initial / cb->edge->speed.value();
-    time = time_ca + time_cb;
-  }
-  else
-  {
-    Record *r = ubodt_->look_up(ca->edge->target, cb->edge->source);
-    if (r == nullptr)
-      return std::numeric_limits<double>::infinity();
+        double time_ca = ca_remaining / ca->edge->speed.value();
+        double time_cb = cb_initial / cb->edge->speed.value();
+        time = time_ca + time_cb;
+    }
+    else
+    {
+        Record *r = ubodt_->look_up(ca->edge->target, cb->edge->source);
+        if (r == nullptr)
+            return std::numeric_limits<double>::infinity();
 
-    // Calculate time on ca and cb edges
-    // Speed is guaranteed to exist since NetworkGraph constructor validates this in FASTEST mode
-    double ca_remaining = ca->edge->length - ca->offset;
-    double cb_initial = cb->offset;
+        // Calculate time on ca and cb edges
+        // Speed is guaranteed to exist since NetworkGraph constructor validates this in FASTEST mode
+        double ca_remaining = ca->edge->length - ca->offset;
+        double cb_initial = cb->offset;
 
-    double time_ca = ca_remaining / ca->edge->speed.value();
-    double time_cb = cb_initial / cb->edge->speed.value();
+        double time_ca = ca_remaining / ca->edge->speed.value();
+        double time_cb = cb_initial / cb->edge->speed.value();
 
-    // UBODT cost: for FASTEST mode it should be time, for SHORTEST it's distance
-    // This is a known limitation - ideally UBODT should be mode-specific
-    time = time_ca + r->cost + time_cb;
-  }
-  return time;
+        // UBODT cost: for FASTEST mode it should be time, for SHORTEST it's distance
+        // This is a known limitation - ideally UBODT should be mode-specific
+        time = time_ca + r->cost + time_cb;
+    }
+    return time;
 }
 
 int FastMapMatch::update_tg(TransitionGraph *tg, const Trajectory &trajectory, const FastMapMatchConfig &config, bool *all_connected)
 {
-  SPDLOG_DEBUG("Update transition graph");
-  std::vector<TGLayer> &layers = tg->get_layers();
-  std::vector<double> euclidean_distances = ALGORITHM::calculate_linestring_euclidean_distances(trajectory.geom);
-  int N = layers.size();
+    SPDLOG_DEBUG("Update transition graph");
+    std::vector<TGLayer> &layers = tg->get_layers();
+    std::vector<double> euclidean_distances = ALGORITHM::calculate_linestring_euclidean_distances(trajectory.geom);
+    int N = layers.size();
 
-  for (int i = 0; i < N - 1; ++i)
-  {
-    SPDLOG_DEBUG("Update layer {} ", i);
-    bool layer_connected = false;
-    update_layer(i, &(layers[i]), &(layers[i + 1]), euclidean_distances[i], config, &layer_connected);
-    if (!layer_connected)
+    for (int i = 0; i < N - 1; ++i)
     {
-      SPDLOG_DEBUG("Traj {} unmatched as point {} and {} not connected", trajectory.id, i, i + 1);
-      if (all_connected != nullptr)
-      {
-        *all_connected = false;
-      }
-      return i;
-      // tg->print_optimal_info();
+        SPDLOG_DEBUG("Update layer {} ", i);
+        bool layer_connected = false;
+        update_layer(i, &(layers[i]), &(layers[i + 1]), euclidean_distances[i], config, &layer_connected);
+        if (!layer_connected)
+        {
+            SPDLOG_DEBUG("Traj {} unmatched as point {} and {} not connected", trajectory.id, i, i + 1);
+            if (all_connected != nullptr)
+            {
+                *all_connected = false;
+            }
+            return i;
+            // tg->print_optimal_info();
+        }
     }
-  }
-  SPDLOG_DEBUG("Update transition graph done");
-  if (all_connected != nullptr)
-  {
-    *all_connected = true;
-  }
-  return N - 1;
+    SPDLOG_DEBUG("Update transition graph done");
+    if (all_connected != nullptr)
+    {
+        *all_connected = true;
+    }
+    return N - 1;
 }
 
 void FastMapMatch::update_layer(int level, TGLayer *la_ptr, TGLayer *lb_ptr, double euclidean_distance, const FastMapMatchConfig &config, bool *connected)
 {
-  TGLayer &lb = *lb_ptr;
-  bool layer_connected = false;
-  for (auto iter_a = la_ptr->begin(); iter_a != la_ptr->end(); ++iter_a)
-  {
-    NodeIndex source = iter_a->c->index;
-    for (auto iter_b = lb_ptr->begin(); iter_b != lb_ptr->end(); ++iter_b)
+    TGLayer &lb = *lb_ptr;
+    bool layer_connected = false;
+    for (auto iter_a = la_ptr->begin(); iter_a != la_ptr->end(); ++iter_a)
     {
-      // Calculate transition probability based on mode
-      double tp;
-      double path_cost; // Cost (distance or time) of path
-      if (config.transition_mode == TransitionMode::FASTEST)
-      {
-        path_cost = get_time(iter_a->c, iter_b->c, config.reverse_tolerance);
-        tp = TransitionGraph::get_fastest_transition_probability(path_cost, euclidean_distance, config.reference_speed.value());
-      }
-      else
-      {
-        path_cost = get_distance(iter_a->c, iter_b->c, config.reverse_tolerance);
-        tp = TransitionGraph::get_shortest_transition_probability(path_cost, euclidean_distance);
-      }
-
-      double temp = iter_a->cumu_prob + log(tp) + log(iter_b->ep);
-      SPDLOG_TRACE("L {} f {} t {} cost {} dist {} tp {} ep {} fcp {} tcp {}",
-                   level, iter_a->c->edge->id, iter_b->c->edge->id,
-                   path_cost, euclidean_distance, tp, iter_b->ep, iter_a->cumu_prob,
-                   temp);
-      if (temp >= iter_b->cumu_prob)
-      {
-        if (temp > -std::numeric_limits<double>::infinity())
+        NodeIndex source = iter_a->c->index;
+        for (auto iter_b = lb_ptr->begin(); iter_b != lb_ptr->end(); ++iter_b)
         {
-          layer_connected = true;
+            // Calculate transition probability based on mode
+            double tp;
+            double path_cost; // Cost (distance or time) of path
+            if (config.transition_mode == TransitionMode::FASTEST)
+            {
+                path_cost = get_time(iter_a->c, iter_b->c, config.reverse_tolerance);
+                tp = TransitionGraph::get_fastest_transition_probability(path_cost, euclidean_distance, config.reference_speed.value());
+            }
+            else
+            {
+                path_cost = get_distance(iter_a->c, iter_b->c, config.reverse_tolerance);
+                tp = TransitionGraph::get_shortest_transition_probability(path_cost, euclidean_distance);
+            }
+
+            double temp = iter_a->cumu_prob + log(tp) + log(iter_b->ep);
+            SPDLOG_TRACE("L {} f {} t {} cost {} dist {} tp {} ep {} fcp {} tcp {}",
+                         level, iter_a->c->edge->id, iter_b->c->edge->id,
+                         path_cost, euclidean_distance, tp, iter_b->ep, iter_a->cumu_prob,
+                         temp);
+            if (temp >= iter_b->cumu_prob)
+            {
+                if (temp > -std::numeric_limits<double>::infinity())
+                {
+                    layer_connected = true;
+                }
+                iter_b->cumu_prob = temp;
+                iter_b->prev = &(*iter_a);
+                iter_b->tp = tp;
+                iter_b->shortest_path_distance = path_cost; // Note: This stores cost (distance or time)
+            }
         }
-        iter_b->cumu_prob = temp;
-        iter_b->prev = &(*iter_a);
-        iter_b->tp = tp;
-        iter_b->shortest_path_distance = path_cost; // Note: This stores cost (distance or time)
-      }
     }
-  }
-  if (connected != nullptr)
-  {
-    *connected = layer_connected;
-  }
+    if (connected != nullptr)
+    {
+        *connected = layer_connected;
+    }
+}
+
+PySplitMatchResult FastMapMatch::pymatch_trajectory_split(const CORE::Trajectory &trajectory,
+                                                          const FastMapMatchConfig &config)
+{
+    // Algorithm: Automatic trajectory splitting with candidate reuse
+    // 1. Do candidate search once for all points (performance optimization)
+    // 2. Use a queue to process ranges [start_idx, end_idx]
+    // 3. For each range:
+    //    - If points have no candidates: split into continuous segments and queue them
+    //    - If disconnected layers: split at disconnection point and queue both halves
+    //    - If successful: add to results
+    // 4. Only successful matches are returned in subtrajectories
+    //    Failed points/ranges are simply excluded (not returned as failed sub-trajectories)
+
+    PySplitMatchResult output;
+    output.id = trajectory.id;
+    int N = trajectory.geom.get_num_points();
+
+    SPDLOG_DEBUG("Split matching trajectory {} with {} points", trajectory.id, N);
+
+    // Do candidate search once for all points
+    TrajectoryCandidates tc = network_.search_tr_cs_knn(trajectory.geom, config.k, config.candidate_search_radius);
+    SPDLOG_DEBUG("Trajectory candidates found for all points");
+
+    // Queue of ranges to process [start_idx, end_idx]
+    std::vector<std::pair<int, int>> ranges_to_process;
+    ranges_to_process.push_back({0, N - 1});
+
+    while (!ranges_to_process.empty())
+    {
+        auto range = ranges_to_process.back();
+        ranges_to_process.pop_back();
+        int start_idx = range.first;
+        int end_idx = range.second;
+
+        SPDLOG_DEBUG("Processing range [{}, {}]", start_idx, end_idx);
+
+        // Single point - can't match, just add as failed
+        if (start_idx >= end_idx)
+        {
+            if (start_idx == end_idx)
+            {
+                SPDLOG_DEBUG("Single point at {}, skipping", start_idx);
+                // Don't add single points to output - they're just gaps
+            }
+            continue;
+        }
+
+        // Check for points with no candidates in this range
+        std::vector<int> local_unmatched;
+        for (int i = start_idx; i <= end_idx; ++i)
+        {
+            if (tc[i].empty())
+            {
+                local_unmatched.push_back(i);
+            }
+        }
+
+        if (!local_unmatched.empty())
+        {
+            // Split around unmatched points - create continuous segments
+            std::vector<int> keep_indices;
+            for (int i = start_idx; i <= end_idx; ++i)
+            {
+                if (tc[i].empty() == false)
+                {
+                    keep_indices.push_back(i);
+                }
+            }
+
+            // Build continuous segments from keep_indices
+            std::vector<std::pair<int, int>> segments;
+            if (!keep_indices.empty())
+            {
+                int seg_start = keep_indices[0];
+                int seg_end = keep_indices[0];
+                for (size_t i = 1; i < keep_indices.size(); ++i)
+                {
+                    if (keep_indices[i] == seg_end + 1)
+                    {
+                        seg_end = keep_indices[i];
+                    }
+                    else
+                    {
+                        if (seg_end > seg_start)
+                        {
+                            segments.push_back({seg_start, seg_end});
+                        }
+                        seg_start = keep_indices[i];
+                        seg_end = keep_indices[i];
+                    }
+                }
+                if (seg_end > seg_start)
+                {
+                    segments.push_back({seg_start, seg_end});
+                }
+            }
+
+            SPDLOG_DEBUG("Found {} unmatched candidates, splitting into {} segments",
+                         local_unmatched.size(), segments.size());
+
+            // Add segments to process queue (in reverse order so they process in correct order)
+            for (auto it = segments.rbegin(); it != segments.rend(); ++it)
+            {
+                ranges_to_process.push_back(*it);
+            }
+            continue;
+        }
+
+        // All points have candidates - try to match
+        TrajectoryCandidates sub_tc(tc.begin() + start_idx, tc.begin() + end_idx + 1);
+        TransitionGraph tg(sub_tc, config.gps_error);
+
+        // Create sub-geometry for distance calculation
+        CORE::LineString sub_geom;
+        for (int i = start_idx; i <= end_idx; ++i)
+        {
+            sub_geom.add_point(trajectory.geom.get_x(i), trajectory.geom.get_y(i));
+        }
+        std::vector<double> euclidean_distances = ALGORITHM::calculate_linestring_euclidean_distances(sub_geom);
+
+        // Update transition graph
+        std::vector<TGLayer> &layers = tg.get_layers();
+        bool fully_connected = true;
+        int last_connected_local = -1;
+
+        for (int i = 0; i < layers.size() - 1; ++i)
+        {
+            bool layer_connected = false;
+            update_layer(i, &(layers[i]), &(layers[i + 1]), euclidean_distances[i], config, &layer_connected);
+
+            if (!layer_connected)
+            {
+                SPDLOG_DEBUG("Disconnected at local points {} and {}", i, i + 1);
+                last_connected_local = i;
+                fully_connected = false;
+                break;
+            }
+        }
+
+        if (!fully_connected && last_connected_local >= 0)
+        {
+            // DISCONNECTED_LAYERS - split at the disconnection
+            int split_point = start_idx + last_connected_local;
+
+            SPDLOG_DEBUG("Disconnected layers, splitting at trajectory point {}", split_point + 1);
+
+            // Add the two halves to the queue (in reverse order)
+            if (split_point + 1 <= end_idx)
+            {
+                ranges_to_process.push_back({split_point + 1, end_idx});
+            }
+            if (start_idx <= split_point)
+            {
+                ranges_to_process.push_back({start_idx, split_point});
+            }
+            continue;
+        }
+
+        if (!fully_connected)
+        {
+            // Failed to match even the first two points - shouldn't happen if we checked candidates
+            SPDLOG_WARN("Failed to match range [{}, {}] even though all points have candidates", start_idx, end_idx);
+            continue;
+        }
+
+        // Successfully matched this range!
+        TGOpath tg_opath = tg.backtrack();
+        MatchedCandidatePath matched_path(tg_opath.size());
+        std::transform(tg_opath.begin(), tg_opath.end(), matched_path.begin(),
+                       [](const TGNode *a)
+                       { return MatchedCandidate{*(a->c), a->ep, a->tp, a->shortest_path_distance}; });
+
+        std::vector<int> indices;
+        const std::vector<Edge> &edges = network_.get_edges();
+        CompletePath complete_path = ubodt_->construct_complete_path(trajectory.id, tg_opath, edges, &indices, config.reverse_tolerance);
+
+        // Build PyMatchSegments
+        PySubTrajectory success_sub;
+        success_sub.start_index = start_idx;
+        success_sub.end_index = end_idx;
+        success_sub.error_code = MatchErrorCode::SUCCESS;
+        success_sub.segments = build_py_segments(matched_path, complete_path, indices, trajectory, start_idx, end_idx);
+        output.subtrajectories.push_back(success_sub);
+
+        SPDLOG_DEBUG("Successfully matched range [{}, {}]", start_idx, end_idx);
+    }
+
+    SPDLOG_DEBUG("Split matching complete: {} sub-trajectories", output.subtrajectories.size());
+    return output;
+}
+
+std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandidatePath &matched_path,
+                                                            const CompletePath &complete_path,
+                                                            const std::vector<int> &indices,
+                                                            const CORE::Trajectory &trajectory,
+                                                            int start_idx,
+                                                            int end_idx)
+{
+    std::vector<PyMatchSegment> segments;
+    double cumulative_distance = 0;
+
+    for (int i = 1; i < matched_path.size(); ++i)
+    {
+        const MatchedCandidate &mc0 = matched_path[i - 1];
+        const MatchedCandidate &mc1 = matched_path[i];
+
+        const int start_edge_index = indices[i - 1];
+        const int end_edge_index = indices[i];
+
+        if (start_edge_index < 0 || start_edge_index >= complete_path.size() ||
+            end_edge_index < 0 || end_edge_index >= complete_path.size())
+        {
+            SPDLOG_WARN("Edge index out of bounds");
+            continue;
+        }
+
+        int traj_idx_0 = start_idx + i - 1;
+        int traj_idx_1 = start_idx + i;
+
+        const PyMatchCandidate start_candidate = {
+            boost::geometry::get<0>(mc0.c.point),
+            boost::geometry::get<1>(mc0.c.point),
+            trajectory.timestamps.empty() ? 0.0 : trajectory.timestamps[traj_idx_0],
+            mc0.c.dist,
+            mc0.c.offset};
+
+        const PyMatchCandidate end_candidate = {
+            boost::geometry::get<0>(mc1.c.point),
+            boost::geometry::get<1>(mc1.c.point),
+            trajectory.timestamps.empty() ? 0.0 : trajectory.timestamps[traj_idx_1],
+            mc1.c.dist,
+            mc1.c.offset};
+
+        PyMatchSegment segment = {start_candidate, end_candidate, {}};
+
+        if (start_edge_index == end_edge_index)
+        {
+            // Single edge
+            EdgeID edge_id = complete_path[start_edge_index];
+            const Edge &e0 = network_.get_edge(edge_id);
+            FASTMM::CORE::LineString line = ALGORITHM::cutoffseg_unique(e0.geom, mc0.c.offset, mc1.c.offset);
+            std::vector<double> distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
+            std::vector<PyMatchPoint> points;
+            double start_distance = cumulative_distance;
+
+            for (int j = 0; j < line.get_num_points(); ++j)
+            {
+                if (j > 0)
+                    cumulative_distance += distances[j - 1];
+                points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
+            }
+            segment.edges.push_back({edge_id, points});
+        }
+        else
+        {
+            // Multiple edges - first edge
+            EdgeID edge_id = complete_path[start_edge_index];
+            const Edge &e0 = network_.get_edge(edge_id);
+            FASTMM::CORE::LineString line = ALGORITHM::cutoffseg_unique(e0.geom, mc0.c.offset, e0.length);
+            std::vector<double> distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
+            std::vector<PyMatchPoint> points;
+            double start_distance = cumulative_distance;
+
+            for (int j = 0; j < line.get_num_points(); ++j)
+            {
+                if (j > 0)
+                    cumulative_distance += distances[j - 1];
+                points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
+            }
+            segment.edges.push_back({edge_id, points});
+
+            // Middle edges
+            for (int j = start_edge_index + 1; j < end_edge_index; ++j)
+            {
+                edge_id = complete_path[j];
+                line = network_.get_edge(edge_id).geom;
+                distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
+                points.clear();
+                start_distance = cumulative_distance;
+
+                for (int k = 0; k < line.get_num_points(); ++k)
+                {
+                    if (k > 0)
+                        cumulative_distance += distances[k - 1];
+                    points.push_back({line.get_x(k), line.get_y(k), cumulative_distance - start_distance, cumulative_distance});
+                }
+                segment.edges.push_back({edge_id, points});
+            }
+
+            // Last edge
+            edge_id = complete_path[end_edge_index];
+            const Edge &e1 = network_.get_edge(edge_id);
+            line = ALGORITHM::cutoffseg_unique(e1.geom, 0, mc1.c.offset);
+            distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
+            points.clear();
+            start_distance = cumulative_distance;
+
+            for (int j = 0; j < line.get_num_points(); ++j)
+            {
+                if (j > 0)
+                    cumulative_distance += distances[j - 1];
+                points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
+            }
+            segment.edges.push_back({edge_id, points});
+        }
+
+        segments.push_back(segment);
+    }
+
+    return segments;
 }
