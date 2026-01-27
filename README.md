@@ -37,20 +37,84 @@ pip install fastmm
 - Improve serialization of UBODT to be cross-platform.
 - Specify versions for build libs (e.g. cibuildwheel).
 
-### Custom costs
+## Routing Modes: SHORTEST vs FASTEST
 
-To implement, just update the NetworkGraph construction, and set g[e].length = edge.cost (where you read edge in from the read_ogr_file etc.). The change transition probability to
+FastMM supports two routing modes that affect how map matching selects the most likely path:
 
+### SHORTEST Mode (Distance-based)
+
+Uses distance as the routing metric. This is the default mode and matches trajectories based on spatial proximity.
+
+```python
+import fastmm
+
+# Create network with SHORTEST mode (default)
+network = fastmm.Network()
+network.add_edge(edge_id=1, source=1, target=2, geom=linestring)
+network.build_rtree_index()
+
+# Create graph for distance-based routing
+graph = fastmm.NetworkGraph(network, mode=fastmm.TransitionMode.SHORTEST)
+
+# Configure matcher (SHORTEST is default)
+config = fastmm.FastMapMatchConfig(
+    k=8,
+    candidate_search_radius=50,
+    gps_error=50,
+    transition_mode=fastmm.TransitionMode.SHORTEST
+)
 ```
-// double tp = TransitionGraph::calculate_transition_probability(shortest_path_distance, euclidean_distance);
-double tp = exp(-0.01 * shortest_path_distance); //
+
+**Transition Probability Calculation (SHORTEST):**
+```
+tp = min(euclidean_dist, path_dist) / max(euclidean_dist, path_dist)
 ```
 
- Seems to work:
+This compares the straight-line distance between GPS points to the network path distance. Higher probability when the path closely follows the GPS trajectory.
 
-- set cost to 1 and it minimizes the number of edges
-- set cost to edge length, and gives similar result (as both the methods minimise distance - only differences is the previous method is using euclidean distance between candidates maybe, not matched points? would only matter with dense points).
-- can prevent some edges being used by manually bumping up their cost (tested on one road by cost *= 100 for those edges - worked, it avoided those edges).
-- Untested:
-  - time based: if we have speed on all edges, set cost = distance / speed.
-  - use road hierachy or similar - prioritise main highways. More useful for addinsight.
+**Practical Effect:** Prefers routes that minimize total distance, even if they involve slower roads. Best for pedestrian tracking, cycling, or when speed data is unavailable.
+
+### FASTEST Mode (Time-based)
+
+Uses travel time as the routing metric. Requires speed values on all edges.
+
+```python
+import fastmm
+
+# Create network with speed on edges
+network = fastmm.Network()
+network.add_edge(edge_id=1, source=1, target=2, geom=linestring, speed=50.0)  # speed in units/time
+network.add_edge(edge_id=2, source=2, target=3, geom=linestring2, speed=30.0)
+network.build_rtree_index()
+
+# Create graph for time-based routing
+graph = fastmm.NetworkGraph(network, mode=fastmm.TransitionMode.FASTEST)
+
+# Configure matcher with reference speed
+config = fastmm.FastMapMatchConfig(
+    k=8,
+    candidate_search_radius=50,
+    gps_error=50,
+    transition_mode=fastmm.TransitionMode.FASTEST,
+    reference_speed=40.0  # Expected travel speed (required for FASTEST)
+)
+```
+
+**Transition Probability Calculation (FASTEST):**
+```
+expected_time = euclidean_dist / reference_speed
+actual_time = path_time (sum of segment_length / segment_speed)
+tp = min(expected_time, actual_time) / max(expected_time, actual_time)
+```
+
+This compares the expected time (if traveling straight at reference speed) to the actual time needed to traverse the network path.
+
+**Practical Effect:** Prefers faster routes (highways, arterials) over slower alternatives, even if slightly longer. Best for vehicle tracking where drivers optimize for time, not distance.
+
+### Important Notes
+
+
+- **FASTEST mode requires speed on ALL edges** - the system will throw an error at graph construction if any edge lacks a speed value
+- **Separate UBODTs needed** - Generate separate UBODT files for each mode, as they store different costs (distance vs time)
+- **Reference speed** represents typical vehicle speed for straight-line travel; used to calculate expected time between GPS points
+- Both modes use the same emission probability (based on GPS accuracy) but differ in transition probability calculation

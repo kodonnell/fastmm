@@ -33,8 +33,8 @@ target_link_libraries(fastmm PRIVATE pybind11::pybind11 Python3::Module)
 set(FASTMM_LINK_LIBS FASTMMLIB)
 target_link_libraries(fastmm PRIVATE ${FASTMM_LINK_LIBS})
 
-# Use C++14
-set_target_properties(fastmm PROPERTIES CXX_STANDARD 14)
+# Use C++17 (pybind11 3.0+ requires C++17)
+set_target_properties(fastmm PROPERTIES CXX_STANDARD 17)
 
 # Set RPATH so the extension can find libfastmmlib.so in the same directory
 if(UNIX AND NOT APPLE)
@@ -72,3 +72,30 @@ install(DIRECTORY ${PROJECT_SOURCE_DIR}/python/fastmm/
     FILES_MATCHING PATTERN "*.py"
     PATTERN "__pycache__" EXCLUDE
     PATTERN "*.egg-info" EXCLUDE)
+
+# Generate stubs after installation using install(CODE)
+install(CODE "
+    message(STATUS \"Generating type stubs...\")
+    execute_process(
+        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/generate_stubs_for_wheel.py \${CMAKE_INSTALL_PREFIX} ${PROJECT_SOURCE_DIR}/python/fastmm
+        RESULT_VARIABLE STUB_RESULT
+        OUTPUT_VARIABLE STUB_OUTPUT
+        ERROR_VARIABLE STUB_ERROR
+    )
+    if(STUB_OUTPUT)
+        message(STATUS \"\${STUB_OUTPUT}\")
+    endif()
+    if(NOT STUB_RESULT EQUAL 0)
+        if(STUB_ERROR)
+            message(\"Stub generation error output:\")
+            message(\"\${STUB_ERROR}\")
+        endif()
+        message(FATAL_ERROR \"Stub generation failed with exit code \${STUB_RESULT}. Install pybind11-stubgen: pip install pybind11-stubgen\")
+    endif()
+" COMPONENT python)
+
+# Install any generated stub files
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/python/fastmm/
+    DESTINATION .
+    COMPONENT python
+    FILES_MATCHING PATTERN "*.pyi")

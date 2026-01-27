@@ -95,10 +95,10 @@ int DummyGraph::get_edge_index(NodeIndex source, NodeIndex target, double cost)
     SPDLOG_TRACE("Target index {} {} id {} e length {} {}",
                  target_idx, boost::target(e, g),
                  g[e].index,
-                 g[e].length,
-                 std::abs(g[e].length - cost));
+                 g[e].cost,
+                 std::abs(g[e].cost - cost));
     if (target_idx == boost::target(e, g) &&
-        (std::abs(g[e].length - cost) <= DOUBLE_MIN))
+        (std::abs(g[e].cost - cost) <= DOUBLE_MIN))
     {
       return g[e].index;
     }
@@ -148,7 +148,7 @@ void DummyGraph::add_edge(NodeIndex source, NodeIndex target,
   boost::tie(e, inserted) = boost::add_edge(source_idx, target_idx, g);
   // id is the FID read, id_attr is the external property in SHP
   g[e].index = edge_index;
-  g[e].length = cost;
+  g[e].cost = cost;
 }
 
 CompositeGraph::CompositeGraph(const NetworkGraph &g, const DummyGraph &dg) : g_(g), dg_(dg)
@@ -195,7 +195,7 @@ std::vector<CompEdgeProperty> CompositeGraph::out_edges(NodeIndex u) const
       e = *out_i;
       NodeIndex v_internal = boost::target(e, dg);
       NodeIndex v = dg_.get_external_index(v_internal);
-      out_edges.push_back(CompEdgeProperty{v, dg[e].length});
+      out_edges.push_back(CompEdgeProperty{v, dg[e].cost});
     }
   }
   if (u < num_vertices)
@@ -207,7 +207,7 @@ std::vector<CompEdgeProperty> CompositeGraph::out_edges(NodeIndex u) const
       e = *out_i;
       NodeIndex v = boost::target(e, g);
       // Export a pair of (v,cost)
-      out_edges.push_back(CompEdgeProperty{v, g[e].length});
+      out_edges.push_back(CompEdgeProperty{v, g[e].cost});
     }
   }
   return out_edges;

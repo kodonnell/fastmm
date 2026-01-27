@@ -28,6 +28,12 @@
 
 namespace FASTMM
 {
+  namespace MM
+  {
+    // Forward declaration
+    enum class TransitionMode;
+  }
+
   namespace NETWORK
   {
     /**
@@ -39,8 +45,10 @@ namespace FASTMM
       /**
        *  Construct a network graph from a network
        *  @param network_arg network data
+       *  @param mode routing mode (SHORTEST for distance-based, FASTEST for time-based)
        */
-      explicit NetworkGraph(const Network &network_arg);
+      explicit NetworkGraph(const Network &network_arg,
+                            MM::TransitionMode mode = static_cast<MM::TransitionMode>(0));
       /**
        * Dijkstra Shortest path query from source to target
        * @param source

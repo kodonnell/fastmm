@@ -36,8 +36,15 @@ Network::Network() : num_vertices(0)
 }
 
 void Network::add_edge(EdgeID edge_id, NodeID source, NodeID target,
-                       const FASTMM::CORE::LineString &geom)
+                       const FASTMM::CORE::LineString &geom,
+                       std::optional<double> speed)
 {
+  // Validate speed if provided
+  if (speed.has_value() && speed.value() <= 0)
+  {
+    throw std::invalid_argument("Speed must be positive");
+  }
+
   NodeIndex s_idx, t_idx;
   if (node_map.find(source) == node_map.end())
   {
@@ -63,7 +70,7 @@ void Network::add_edge(EdgeID edge_id, NodeID source, NodeID target,
     t_idx = node_map[target];
   }
   EdgeIndex index = edges.size();
-  edges.push_back({index, edge_id, s_idx, t_idx, geom.get_length(), geom});
+  edges.push_back({index, edge_id, s_idx, t_idx, geom.get_length(), speed, geom});
   edge_map.insert({edge_id, index});
   num_vertices = node_id_vec.size();
 };

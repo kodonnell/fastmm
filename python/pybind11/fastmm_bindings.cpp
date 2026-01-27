@@ -59,6 +59,12 @@ PYBIND11_MODULE(fastmm, m)
         .value("UNKNOWN_ERROR", MatchErrorCode::UNKNOWN_ERROR, "Unknown error occurred")
         .export_values();
 
+    // TransitionMode enum
+    py::enum_<TransitionMode>(m, "TransitionMode")
+        .value("SHORTEST", TransitionMode::SHORTEST, "Distance-based routing")
+        .value("FASTEST", TransitionMode::FASTEST, "Time-based routing")
+        .export_values();
+
     // Network class
     py::class_<Network>(m, "Network")
         .def(py::init<>(), "Create an empty network. Use add_edge() to populate it, then call build_rtree_index().")
@@ -67,6 +73,7 @@ PYBIND11_MODULE(fastmm, m)
              py::arg("source"),
              py::arg("target"),
              py::arg("geom"),
+             py::arg("speed") = std::nullopt,
              "Add an edge to the network. Call build_rtree_index() after adding all edges.")
         .def("build_rtree_index", &Network::build_rtree_index,
              "Build the spatial index. Must be called after adding all edges and before performing spatial queries.")
@@ -75,7 +82,10 @@ PYBIND11_MODULE(fastmm, m)
 
     // NetworkGraph class
     py::class_<NetworkGraph>(m, "NetworkGraph")
-        .def(py::init<const Network &>(), py::arg("network"));
+        .def(py::init<const Network &, TransitionMode>(), 
+             py::arg("network"), 
+             py::arg("mode") = TransitionMode::SHORTEST,
+             "Create a NetworkGraph from a Network with specified routing mode");
 
     // UBODTGenAlgorithm class
     py::class_<UBODTGenAlgorithm>(m, "UBODTGenAlgorithm")
@@ -90,15 +100,20 @@ PYBIND11_MODULE(fastmm, m)
 
     // FastMapMatchConfig class
     py::class_<FastMapMatchConfig>(m, "FastMapMatchConfig")
-        .def(py::init<int, double, double, double>(),
+        .def(py::init<int, double, double, double, TransitionMode, std::optional<double>>(),
              py::arg("k") = 8,
              py::arg("candidate_search_radius") = 50,
              py::arg("gps_error") = 50,
-             py::arg("reverse_tolerance") = 0.0)
+             py::arg("reverse_tolerance") = 0.0,
+             py::arg("transition_mode") = TransitionMode::SHORTEST,
+             py::arg("reference_speed") = std::nullopt,
+             "Create a FastMapMatchConfig. For FASTEST mode, reference_speed must be provided.")
         .def_readwrite("k", &FastMapMatchConfig::k)
         .def_readwrite("candidate_search_radius", &FastMapMatchConfig::candidate_search_radius)
         .def_readwrite("gps_error", &FastMapMatchConfig::gps_error)
-        .def_readwrite("reverse_tolerance", &FastMapMatchConfig::reverse_tolerance);
+        .def_readwrite("reverse_tolerance", &FastMapMatchConfig::reverse_tolerance)
+        .def_readwrite("transition_mode", &FastMapMatchConfig::transition_mode)
+        .def_readwrite("reference_speed", &FastMapMatchConfig::reference_speed);
 
     // PyMatchPoint struct
     py::class_<PyMatchPoint>(m, "PyMatchPoint")

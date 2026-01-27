@@ -15,11 +15,26 @@ using namespace FASTMM::MM;
 FastMapMatchConfig::FastMapMatchConfig(int k_arg,
                                        double candidate_search_radius,
                                        double gps_error,
-                                       double reverse_tolerance) : k(k_arg),
-                                                                   candidate_search_radius(candidate_search_radius),
-                                                                   gps_error(gps_error),
-                                                                   reverse_tolerance(reverse_tolerance) {
-                                                                   };
+                                       double reverse_tolerance,
+                                       TransitionMode transition_mode,
+                                       std::optional<double> reference_speed)
+    : k(k_arg),
+      candidate_search_radius(candidate_search_radius),
+      gps_error(gps_error),
+      reverse_tolerance(reverse_tolerance),
+      transition_mode(transition_mode),
+      reference_speed(reference_speed)
+{
+  // Validation
+  if (transition_mode == TransitionMode::FASTEST && !reference_speed.has_value())
+  {
+    throw std::invalid_argument("Reference speed is required for FASTEST mode");
+  }
+  if (reference_speed.has_value() && reference_speed.value() <= 0)
+  {
+    throw std::invalid_argument("Reference speed must be positive");
+  }
+};
 
 MatchResult FastMapMatch::match_trajectory(const Trajectory &trajectory, const FastMapMatchConfig &config)
 {
@@ -52,7 +67,7 @@ MatchResult FastMapMatch::match_trajectory(const Trajectory &trajectory, const F
   SPDLOG_DEBUG("Update cost in transition graph");
   // The network will be used internally to update transition graph
   bool all_connected = false;
-  int last_connected = update_tg(&tg, trajectory, &all_connected, config.reverse_tolerance);
+  int last_connected = update_tg(&tg, trajectory, config, &all_connected);
   if (!all_connected)
   {
     SPDLOG_DEBUG("Traj {} unmatched at trajectory point {}", trajectory.id, last_connected);
@@ -233,38 +248,84 @@ PyMatchResult FastMapMatch::pymatch_trajectory(const CORE::Trajectory &trajector
   return output;
 }
 
-double FastMapMatch::get_shortest_path_distance(const Candidate *ca, const Candidate *cb, double reverse_tolerance)
+double FastMapMatch::get_distance(const Candidate *ca, const Candidate *cb, double reverse_tolerance)
 {
-  double shortest_path_distance = 0;
+  double distance = 0;
   if (ca->edge->id == cb->edge->id && ca->offset <= cb->offset)
   {
     // Transition on the same edge, where b is after a i.e. not reversing.
-    shortest_path_distance = cb->offset - ca->offset;
+    distance = cb->offset - ca->offset;
   }
   else if (ca->edge->id == cb->edge->id && ca->offset - cb->offset < ca->edge->length * reverse_tolerance)
   {
     // Transition on the same edge, where b is before a but also within the reverse tolerance, then allow.
-    shortest_path_distance = 0;
+    distance = 0;
   }
   else if (ca->edge->target == cb->edge->source)
   {
     // Transition on the same OD nodes
-    shortest_path_distance = ca->edge->length - ca->offset + cb->offset;
+    distance = ca->edge->length - ca->offset + cb->offset;
   }
   else
   {
     Record *r = ubodt_->look_up(ca->edge->target, cb->edge->source);
     // No sp path exist from O to D.
-    // TODO: could use djikstra here to lookup the sp distance
     if (r == nullptr)
       return std::numeric_limits<double>::infinity();
-    // calculate original SP distance
-    shortest_path_distance = r->cost + ca->edge->length - ca->offset + cb->offset;
+    // UBODT stores cost (distance for SHORTEST mode, time for FASTEST mode)
+    distance = r->cost + ca->edge->length - ca->offset + cb->offset;
   }
-  return shortest_path_distance;
+  return distance;
 }
 
-int FastMapMatch::update_tg(TransitionGraph *tg, const Trajectory &trajectory, bool *all_connected, double reverse_tolerance)
+double FastMapMatch::get_time(const Candidate *ca, const Candidate *cb, double reverse_tolerance)
+{
+  double time = 0;
+  if (ca->edge->id == cb->edge->id && ca->offset <= cb->offset)
+  {
+    // Transition on the same edge
+    // Speed is guaranteed to exist since NetworkGraph constructor validates this in FASTEST mode
+    double segment_distance = cb->offset - ca->offset;
+    time = segment_distance / ca->edge->speed.value();
+  }
+  else if (ca->edge->id == cb->edge->id && ca->offset - cb->offset < ca->edge->length * reverse_tolerance)
+  {
+    // Reverse within tolerance
+    time = 0;
+  }
+  else if (ca->edge->target == cb->edge->source)
+  {
+    // Transition on adjacent edges
+    // Speed is guaranteed to exist since NetworkGraph constructor validates this in FASTEST mode
+    double ca_remaining = ca->edge->length - ca->offset;
+    double cb_initial = cb->offset;
+
+    double time_ca = ca_remaining / ca->edge->speed.value();
+    double time_cb = cb_initial / cb->edge->speed.value();
+    time = time_ca + time_cb;
+  }
+  else
+  {
+    Record *r = ubodt_->look_up(ca->edge->target, cb->edge->source);
+    if (r == nullptr)
+      return std::numeric_limits<double>::infinity();
+
+    // Calculate time on ca and cb edges
+    // Speed is guaranteed to exist since NetworkGraph constructor validates this in FASTEST mode
+    double ca_remaining = ca->edge->length - ca->offset;
+    double cb_initial = cb->offset;
+
+    double time_ca = ca_remaining / ca->edge->speed.value();
+    double time_cb = cb_initial / cb->edge->speed.value();
+
+    // UBODT cost: for FASTEST mode it should be time, for SHORTEST it's distance
+    // This is a known limitation - ideally UBODT should be mode-specific
+    time = time_ca + r->cost + time_cb;
+  }
+  return time;
+}
+
+int FastMapMatch::update_tg(TransitionGraph *tg, const Trajectory &trajectory, const FastMapMatchConfig &config, bool *all_connected)
 {
   SPDLOG_DEBUG("Update transition graph");
   std::vector<TGLayer> &layers = tg->get_layers();
@@ -275,7 +336,7 @@ int FastMapMatch::update_tg(TransitionGraph *tg, const Trajectory &trajectory, b
   {
     SPDLOG_DEBUG("Update layer {} ", i);
     bool layer_connected = false;
-    update_layer(i, &(layers[i]), &(layers[i + 1]), euclidean_distances[i], reverse_tolerance, &layer_connected);
+    update_layer(i, &(layers[i]), &(layers[i + 1]), euclidean_distances[i], config, &layer_connected);
     if (!layer_connected)
     {
       SPDLOG_DEBUG("Traj {} unmatched as point {} and {} not connected", trajectory.id, i, i + 1);
@@ -295,9 +356,8 @@ int FastMapMatch::update_tg(TransitionGraph *tg, const Trajectory &trajectory, b
   return N - 1;
 }
 
-void FastMapMatch::update_layer(int level, TGLayer *la_ptr, TGLayer *lb_ptr, double euclidean_distance, double reverse_tolerance, bool *connected)
+void FastMapMatch::update_layer(int level, TGLayer *la_ptr, TGLayer *lb_ptr, double euclidean_distance, const FastMapMatchConfig &config, bool *connected)
 {
-  // SPDLOG_TRACE("Update layer");
   TGLayer &lb = *lb_ptr;
   bool layer_connected = false;
   for (auto iter_a = la_ptr->begin(); iter_a != la_ptr->end(); ++iter_a)
@@ -305,12 +365,24 @@ void FastMapMatch::update_layer(int level, TGLayer *la_ptr, TGLayer *lb_ptr, dou
     NodeIndex source = iter_a->c->index;
     for (auto iter_b = lb_ptr->begin(); iter_b != lb_ptr->end(); ++iter_b)
     {
-      double shortest_path_distance = get_shortest_path_distance(iter_a->c, iter_b->c, reverse_tolerance);
-      double tp = TransitionGraph::calculate_transition_probability(shortest_path_distance, euclidean_distance);
+      // Calculate transition probability based on mode
+      double tp;
+      double path_cost; // Cost (distance or time) of path
+      if (config.transition_mode == TransitionMode::FASTEST)
+      {
+        path_cost = get_time(iter_a->c, iter_b->c, config.reverse_tolerance);
+        tp = TransitionGraph::get_fastest_transition_probability(path_cost, euclidean_distance, config.reference_speed.value());
+      }
+      else
+      {
+        path_cost = get_distance(iter_a->c, iter_b->c, config.reverse_tolerance);
+        tp = TransitionGraph::get_shortest_transition_probability(path_cost, euclidean_distance);
+      }
+
       double temp = iter_a->cumu_prob + log(tp) + log(iter_b->ep);
-      SPDLOG_TRACE("L {} f {} t {} sp {} dist {} tp {} ep {} fcp {} tcp {}",
+      SPDLOG_TRACE("L {} f {} t {} cost {} dist {} tp {} ep {} fcp {} tcp {}",
                    level, iter_a->c->edge->id, iter_b->c->edge->id,
-                   shortest_path_distance, euclidean_distance, tp, iter_b->ep, iter_a->cumu_prob,
+                   path_cost, euclidean_distance, tp, iter_b->ep, iter_a->cumu_prob,
                    temp);
       if (temp >= iter_b->cumu_prob)
       {
@@ -321,7 +393,7 @@ void FastMapMatch::update_layer(int level, TGLayer *la_ptr, TGLayer *lb_ptr, dou
         iter_b->cumu_prob = temp;
         iter_b->prev = &(*iter_a);
         iter_b->tp = tp;
-        iter_b->shortest_path_distance = shortest_path_distance;
+        iter_b->shortest_path_distance = path_cost; // Note: This stores cost (distance or time)
       }
     }
   }
@@ -329,5 +401,4 @@ void FastMapMatch::update_layer(int level, TGLayer *la_ptr, TGLayer *lb_ptr, dou
   {
     *connected = layer_connected;
   }
-  // SPDLOG_TRACE("Update layer done");
 }

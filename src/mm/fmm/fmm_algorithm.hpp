@@ -16,12 +16,22 @@
 #include "mm/fmm/ubodt.hpp"
 
 #include <string>
+#include <optional>
 #include <boost/property_tree/ptree.hpp>
 
 namespace FASTMM
 {
   namespace MM
   {
+    /**
+     * Routing mode for map matching
+     */
+    enum class TransitionMode
+    {
+      SHORTEST, /**< Distance-based routing */
+      FASTEST   /**< Time-based routing */
+    };
+
     /**
      * Configuration class for fmm algorithm
      */
@@ -33,13 +43,22 @@ namespace FASTMM
        * @param candidate_search_radius the search radius, in map unit, which is the same as
        * GPS data and network data.
        * @param gps_error the gps error, in map unit
-       *
+       * @param reverse_tolerance reverse tolerance
+       * @param transition_mode routing mode (SHORTEST or FASTEST)
+       * @param reference_speed reference speed for FASTEST mode (required if mode is FASTEST)
        */
-      FastMapMatchConfig(int k_arg = 8, double candidate_search_radius = 50, double gps_error = 50, double reverse_tolerance = 0.0);
-      int k;                          /**< Number of candidates */
-      double candidate_search_radius; /**< Search radius*/
-      double gps_error;               /**< GPS error */
-      double reverse_tolerance;
+      FastMapMatchConfig(int k_arg = 8,
+                         double candidate_search_radius = 50,
+                         double gps_error = 50,
+                         double reverse_tolerance = 0.0,
+                         TransitionMode transition_mode = TransitionMode::SHORTEST,
+                         std::optional<double> reference_speed = std::nullopt);
+      int k;                                 /**< Number of candidates */
+      double candidate_search_radius;        /**< Search radius*/
+      double gps_error;                      /**< GPS error */
+      double reverse_tolerance;              /**< Reverse tolerance */
+      TransitionMode transition_mode;        /**< Routing mode */
+      std::optional<double> reference_speed; /**< Reference speed for FASTEST mode */
     };
 
     /**
@@ -78,33 +97,49 @@ namespace FASTMM
 
     protected:
       /**
-       * Get shortest path distance between two candidates
+       * Get path distance between two candidates (always distance, regardless of mode)
        * @param  ca from candidate
        * @param  cb to candidate
-       * @return  shortest path value
+       * @param  reverse_tolerance reverse tolerance parameter
+       * @return  path distance
        */
-      double get_shortest_path_distance(const Candidate *ca,
-                                        const Candidate *cb,
-                                        double reverse_tolerance);
+      double get_distance(const Candidate *ca,
+                          const Candidate *cb,
+                          double reverse_tolerance);
+
+      /**
+       * Get path time between two candidates (distance/speed for each segment)
+       * @param  ca from candidate
+       * @param  cb to candidate
+       * @param  reverse_tolerance reverse tolerance parameter
+       * @return  path time
+       */
+      double get_time(const Candidate *ca,
+                      const Candidate *cb,
+                      double reverse_tolerance);
+
       /**
        * Update probabilities in a transition graph
        * @param tg transition graph
        * @param trajectory raw trajectory
        * @param config map match configuration
+       * @param all_connected output parameter indicating if all layers are connected
        * @return idx of the last connected layer
        */
-      int update_tg(TransitionGraph *tg, const CORE::Trajectory &trajectory, bool *all_connected, double reverse_tolerance = 0);
+      int update_tg(TransitionGraph *tg, const CORE::Trajectory &trajectory, const FastMapMatchConfig &config, bool *all_connected);
       /**
        * Update probabilities between two layers a and b in the transition graph
        * @param level   the index of layer a
        * @param la_ptr  layer a
        * @param lb_ptr  layer b next to a
        * @param euclidean_distance Euclidean distance between two observed point
+       * @param config map match configuration
        * @param connected the variable is set to false if the layer is not connected
        * with the next layer
        */
       void update_layer(int level, TGLayer *la_ptr, TGLayer *lb_ptr,
-                        double euclidean_distance, double reverse_tolerance,
+                        double euclidean_distance,
+                        const FastMapMatchConfig &config,
                         bool *connected);
 
     private:

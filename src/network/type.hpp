@@ -14,6 +14,7 @@
 #include <list>
 #include <string>
 #include <unordered_map>
+#include <optional>
 #include "core/geometry.hpp"
 
 namespace FASTMM
@@ -53,6 +54,7 @@ namespace FASTMM
       NodeIndex source;              /**< source node index */
       NodeIndex target;              /**< target node index */
       double length;                 /**< length of the edge polyline */
+      std::optional<double> speed;   /**< speed limit on the edge (optional) */
       FASTMM::CORE::LineString geom; /**< the edge geometry */
     };
 

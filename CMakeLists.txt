@@ -25,9 +25,11 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 project(fastmm)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (MSVC)
-  add_compile_options(/EHsc)
+  add_compile_options(/EHsc /std:c++17)
 endif()
 
 set(CMAKE_BUILD_TYPE "Release")
@@ -40,7 +42,7 @@ if (MSVC)
 else()
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 endif()
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")

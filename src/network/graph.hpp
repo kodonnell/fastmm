@@ -27,7 +27,7 @@ namespace FASTMM
     struct EdgeProperty
     {
       EdgeIndex index; /**< Index of the edge */
-      double length;   /**< length of the edge */
+      double cost;     /**< Cost of traversing the edge (distance for SHORTEST, time for FASTEST) */
     };
 
     /**

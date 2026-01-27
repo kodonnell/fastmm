@@ -34,9 +34,17 @@ TransitionGraph::TransitionGraph(const TrajectoryCandidates &tc, double gps_erro
   }
 }
 
-double TransitionGraph::calculate_transition_probability(double shortest_path_distance, double euclidean_distance)
+double TransitionGraph::get_shortest_transition_probability(double path_distance, double euclidean_distance)
 {
-  return euclidean_distance >= shortest_path_distance ? 1.0 : euclidean_distance / shortest_path_distance;
+  // Distance-based: compare euclidean distance to shortest path distance
+  return euclidean_distance >= path_distance ? 1.0 : euclidean_distance / path_distance;
+}
+
+double TransitionGraph::get_fastest_transition_probability(double path_time, double euclidean_distance, double reference_speed)
+{
+  // Time-based: compare expected time (euclidean/speed) to actual path time
+  double expected_time = euclidean_distance / reference_speed;
+  return expected_time >= path_time ? 1.0 : expected_time / path_time;
 }
 
 double TransitionGraph::calc_ep(double dist, double error)

@@ -180,9 +180,11 @@ namespace FASTMM
        * @param source the source node ID
        * @param target the target node ID
        * @param geom the geometry of the edge as a LineString
+       * @param speed optional speed limit on the edge (for FASTEST mode)
        */
       void add_edge(EdgeID edge_id, NodeID source, NodeID target,
-                    const FASTMM::CORE::LineString &geom);
+                    const FASTMM::CORE::LineString &geom,
+                    std::optional<double> speed = std::nullopt);
       /**
        * Build rtree spatial index for the network
        *
