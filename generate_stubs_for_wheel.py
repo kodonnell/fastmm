@@ -14,45 +14,45 @@ from pathlib import Path
 def generate_init_pyi(fastmm_pyi_path, target_dir):
     """Generate __init__.pyi from fastmm.pyi to re-export all symbols."""
     print("[+] Generating __init__.pyi from fastmm.pyi")
-    
+
     # Read the generated fastmm.pyi
-    content = fastmm_pyi_path.read_text(encoding='utf-8')
-    
+    content = fastmm_pyi_path.read_text(encoding="utf-8")
+
     # Extract __all__ list
-    all_match = re.search(r'__all__:\s*list\[str\]\s*=\s*\[(.*?)\]', content, re.DOTALL)
+    all_match = re.search(r"__all__:\s*list\[str\]\s*=\s*\[(.*?)\]", content, re.DOTALL)
     if not all_match:
         print("[!] Warning: Could not find __all__ in fastmm.pyi")
         return
-    
+
     # Parse the symbols from __all__
     all_content = all_match.group(1)
-    symbols = [s.strip().strip("'\"") for s in all_content.split(',') if s.strip()]
-    
+    symbols = [s.strip().strip("'\"") for s in all_content.split(",") if s.strip()]
+
     # Generate __init__.pyi content
-    init_pyi = ['"""Type stubs for fastmm package"""', '', 'from .fastmm import (']
-    
+    init_pyi = ['"""Type stubs for fastmm package"""', "", "from .fastmm import ("]
+
     # Add imports
     for symbol in symbols:
-        init_pyi.append(f'    {symbol} as {symbol},')
-    
-    init_pyi.append(')')
-    init_pyi.append('')
-    init_pyi.append('from .matcher import MapMatcher as MapMatcher')
-    init_pyi.append('')
-    init_pyi.append('__version__: str')
-    init_pyi.append('')
-    
+        init_pyi.append(f"    {symbol} as {symbol},")
+
+    init_pyi.append(")")
+    init_pyi.append("")
+    init_pyi.append("from .matcher import MapMatcher as MapMatcher")
+    init_pyi.append("")
+    init_pyi.append("__version__: str")
+    init_pyi.append("")
+
     # Add __all__
-    init_pyi.append('__all__ = [')
+    init_pyi.append("__all__ = [")
     for symbol in symbols:
         init_pyi.append(f'    "{symbol}",')
     init_pyi.append('    "MapMatcher",')
-    init_pyi.append(']')
-    init_pyi.append('')
-    
+    init_pyi.append("]")
+    init_pyi.append("")
+
     # Write __init__.pyi
-    init_pyi_path = target_dir / '__init__.pyi'
-    init_pyi_path.write_text('\n'.join(init_pyi), encoding='utf-8')
+    init_pyi_path = target_dir / "__init__.pyi"
+    init_pyi_path.write_text("\n".join(init_pyi), encoding="utf-8")
     print(f"[+] Generated stub: __init__.pyi with {len(symbols)} symbols")
 
 
@@ -135,7 +135,7 @@ def main():
                 shutil.copy2(stub_src_file, target)
                 print(f"[+] Generated stub: {stub_src_file.name}")
                 stubs_found = True
-                
+
                 # Generate __init__.pyi to re-export everything from fastmm.pyi
                 generate_init_pyi(stub_src_file, fastmm_source_dir)
 
