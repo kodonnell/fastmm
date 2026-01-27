@@ -205,8 +205,9 @@ namespace FASTMM
       static void append_segs_to_line(FASTMM::CORE::LineString *line,
                                       const FASTMM::CORE::LineString &segs,
                                       int offset = 0);
-      Rtree rtree;             // Network rtree structure
-      std::vector<Edge> edges; // all edges in the network
+      Rtree rtree;              // Network rtree structure
+      bool rtree_built = false; // Flag to track if rtree has been built
+      std::vector<Edge> edges;  // all edges in the network
       NodeIDVec node_id_vec;
       unsigned int num_vertices;
       NodeIndexMap node_map;

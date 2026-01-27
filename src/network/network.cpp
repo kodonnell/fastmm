@@ -130,6 +130,11 @@ Point Network::get_node_geom_from_idx(NodeIndex index) const
 // Construct a Rtree using the vector of edges
 void Network::build_rtree_index()
 {
+  if (edges.empty())
+  {
+    throw std::runtime_error("Cannot build rtree index on empty network. Add edges first using add_edge().");
+  }
+
   // Build an rtree for candidate search
   SPDLOG_DEBUG("Create boost rtree");
   // create some Items
@@ -142,6 +147,7 @@ void Network::build_rtree_index()
     boost_box b(Point(x1, y1), Point(x2, y2));
     rtree.insert(std::make_pair(b, edge));
   }
+  rtree_built = true;
   SPDLOG_DEBUG("Create boost rtree done");
 }
 
@@ -152,6 +158,11 @@ TrajectoryCandidates Network::search_tr_cs_knn(Trajectory &trajectory, std::size
 
 TrajectoryCandidates Network::search_tr_cs_knn(const LineString &geom, std::size_t k, double radius) const
 {
+  if (!rtree_built)
+  {
+    throw std::runtime_error("Spatial index not built. Call build_rtree_index() after adding all edges to the network.");
+  }
+
   int NumberPoints = geom.get_num_points();
   TrajectoryCandidates tr_cs(NumberPoints);
   unsigned int current_candidate_index = num_vertices;
