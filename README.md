@@ -113,8 +113,55 @@ This compares the expected time (if traveling straight at reference speed) to th
 
 ### Important Notes
 
-
 - **FASTEST mode requires speed on ALL edges** - the system will throw an error at graph construction if any edge lacks a speed value
 - **Separate UBODTs needed** - Generate separate UBODT files for each mode, as they store different costs (distance vs time)
-- **Reference speed** represents typical vehicle speed for straight-line travel; used to calculate expected time between GPS points
 - Both modes use the same emission probability (based on GPS accuracy) but differ in transition probability calculation
+
+### Understanding Reference Speed
+
+**What is reference_speed?**
+
+The `reference_speed` parameter represents the expected average speed at which a vehicle would travel in a straight line between GPS observation points, **if it could ignore the road network**. It's used exclusively in FASTEST mode to calculate expected travel times.
+
+**How it affects matching:**
+
+In FASTEST mode, the transition probability between two GPS points compares:
+- **Expected time**: How long would it take to travel the straight-line distance at `reference_speed`
+- **Actual time**: How long does the matched network path take (sum of edge_length/edge_speed for each edge)
+
+The probability is higher when these times are similar: `tp = min(expected, actual) / max(expected, actual)`
+
+**Choosing the right value:**
+
+- **Lower values (e.g., 20-30)**:
+  - Makes the algorithm expect slower straight-line travel
+  - Increases expected_time, making actual network paths look relatively faster
+  - **Effect**: Encourages following the road network more closely, even if it means taking detours
+  - **Good for**: Dense urban areas, congested traffic, routes with many turns
+
+- **Higher values (e.g., 60-80)**:
+  - Makes the algorithm expect faster straight-line travel
+  - Decreases expected_time, making actual network paths look relatively slower
+  - **Effect**: More tolerant of GPS points that "cut corners" or skip parts of the route
+  - **Good for**: Highway driving, rural areas, trajectories with sparse GPS sampling
+
+- **Typical values (e.g., 40-50)**:
+  - Match the average actual vehicle speed in your dataset
+  - A good starting point for mixed urban/suburban driving
+  - Should be close to the typical speeds on your network edges
+
+**Practical Example:**
+
+Imagine two GPS points 100 meters apart (straight-line):
+- Network path: follows roads for 120 meters through edges with average speed 50
+- Actual time on network: 120m / 50 = 2.4 time units
+
+With `reference_speed=40`:
+- Expected time: 100m / 40 = 2.5 time units
+- Transition probability: min(2.5, 2.4) / max(2.5, 2.4) = 2.4/2.5 = **0.96** (high - good match!)
+
+With `reference_speed=60`:
+- Expected time: 100m / 60 = 1.67 time units
+- Transition probability: min(1.67, 2.4) / max(1.67, 2.4) = 1.67/2.4 = **0.70** (lower - penalizes this path)
+
+**Rule of thumb**: Set `reference_speed` close to the average speed in your network. If matching is too "sticky" to routes (not handling shortcuts well), increase it. If matching is too loose (taking implausible shortcuts), decrease it.
