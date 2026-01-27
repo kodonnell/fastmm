@@ -29,12 +29,12 @@ pip install fastmm
 
 ## TODO
 
+- Ensure UBODT mode matches network when loaded. Improve serialization of UBODT to be cross-platform.
 - Bring in extra python code.
 - Get test working in python.
 - If not found in UBODT, instead of bailing, do a normal djikstra lookup.
 - Need to check reverse tolerance - on our edges, they're all directed, so we probably shouldn't allow reversing. This causes errors when we're parsing - if you reverse on the same edge, the geometry gets flipped (I think - line = ALGORITHM::cutoffseg_unique(e0.geom, start_offset, end_offset); goes backward?), which then messes with our python post-processing of associating time as the segment start/stop are now the edge stop/start, not the other way round. We could add a reversed flag to the edge? That would help. For now, just don't have a reverse tolerance.
 - Could move the journey splitting (e.g. when unmatched candidate or points too far apart) into the C++ code here. Would be more optimal as a) C++, and b) don't need to repeat candidate lookup etc.
-- Improve serialization of UBODT to be cross-platform.
 - Specify versions for build libs (e.g. cibuildwheel).
 
 ## Routing Modes: SHORTEST vs FASTEST

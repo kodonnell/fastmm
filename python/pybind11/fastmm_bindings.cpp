@@ -22,120 +22,6 @@ PYBIND11_MODULE(fastmm, m)
 {
     m.doc() = "Fast Map Matching (FASTMM) Python bindings via pybind11";
 
-    // Point class
-    py::class_<Point>(m, "Point", R"pbdoc(
-        A 2D point representing a geographic location.
-
-        Points are used to construct LineStrings and represent trajectory locations.
-        Coordinates should be in the same coordinate reference system (CRS) as your
-        network edges, typically a projected coordinate system (e.g., meters).
-    )pbdoc")
-        .def(py::init<double, double>(), py::arg("x"), py::arg("y"), R"pbdoc(
-            Create a Point with x, y coordinates.
-
-            Args:
-                x: X coordinate (typically easting or longitude)
-                y: Y coordinate (typically northing or latitude)
-        )pbdoc")
-        .def("get_x", [](const Point &p)
-             { return boost::geometry::get<0>(p); }, R"pbdoc(
-            Get the x coordinate of the point.
-
-            Returns:
-                float: The x coordinate
-        )pbdoc")
-        .def("get_y", [](const Point &p)
-             { return boost::geometry::get<1>(p); }, R"pbdoc(
-            Get the y coordinate of the point.
-
-            Returns:
-                float: The y coordinate
-        )pbdoc")
-        .def("__repr__", [](const Point &p)
-             { return "<Point x=" + std::to_string(boost::geometry::get<0>(p)) +
-                      " y=" + std::to_string(boost::geometry::get<1>(p)) + ">"; });
-
-    // LineString class
-    py::class_<LineString>(m, "LineString", R"pbdoc(
-        A linestring geometry representing a road edge or path.
-
-        LineStrings are sequences of connected points that define the geometric shape
-        of road network edges. They must contain at least 2 points and should be in
-        the same coordinate reference system as your network.
-    )pbdoc")
-        .def(py::init<>(), R"pbdoc(
-            Create an empty LineString.
-
-            Use add_point() to populate the linestring with points.
-        )pbdoc")
-        .def("add_point", py::overload_cast<double, double>(&LineString::add_point),
-             py::arg("x"), py::arg("y"), R"pbdoc(
-            Add a point to the linestring.
-
-            Points are added in sequence to form the line geometry.
-
-            Args:
-                x: X coordinate of the point
-                y: Y coordinate of the point
-        )pbdoc")
-        .def("get_num_points", &LineString::get_num_points, R"pbdoc(
-            Get the number of points in the linestring.
-
-            Returns:
-                int: Number of points
-        )pbdoc")
-        .def("get_x", &LineString::get_x, py::arg("i"), R"pbdoc(
-            Get x coordinate of the i-th point.
-
-            Args:
-                i: Zero-based index of the point
-
-            Returns:
-                float: X coordinate of the point
-        )pbdoc")
-        .def("get_y", &LineString::get_y, py::arg("i"), R"pbdoc(
-            Get y coordinate of the i-th point.
-
-            Args:
-                i: Zero-based index of the point
-
-            Returns:
-                float: Y coordinate of the point
-        )pbdoc")
-        .def("get_length", &LineString::get_length, R"pbdoc(
-            Get the Euclidean length of the linestring.
-
-            Returns:
-                float: Total length in coordinate units
-        )pbdoc")
-        .def("export_wkt", &LineString::export_wkt, py::arg("precision") = 8, R"pbdoc(
-            Export the linestring as a Well-Known Text (WKT) string.
-
-            Args:
-                precision: Number of decimal places for coordinates (default: 8)
-
-            Returns:
-                str: WKT representation (e.g., 'LINESTRING(0 0, 1 1)')
-        )pbdoc")
-        .def("export_json", &LineString::export_json, R"pbdoc(
-            Export the linestring as a GeoJSON string.
-
-            Returns:
-                str: GeoJSON LineString geometry
-        )pbdoc")
-        .def_static("from_wkt", &wkt2linestring, py::arg("wkt"), R"pbdoc(
-            Create a LineString from a Well-Known Text (WKT) string.
-
-            Args:
-                wkt: WKT string representing a linestring (e.g., 'LINESTRING(0 0, 1 1)')
-
-            Returns:
-                LineString: Parsed linestring geometry
-        )pbdoc")
-        .def("__repr__", [](const LineString &l)
-             { return "<LineString with " + std::to_string(l.get_num_points()) + " points, length=" +
-                      std::to_string(l.get_length()) + ">"; });
-
     // MatchErrorCode enum
     py::enum_<MatchErrorCode>(m, "MatchErrorCode")
         .value("SUCCESS", MatchErrorCode::SUCCESS, "Matching succeeded")
@@ -161,7 +47,7 @@ PYBIND11_MODULE(fastmm, m)
 
         Example:
             >>> network = fastmm.Network()
-            >>> network.add_edge(1, source=10, target=20, geom=linestring, speed=50.0)
+            >>> network.add_edge(1, source=10, target=20, geom=[(0, 0), (100, 0)], speed=50.0)
             >>> network.build_rtree_index()
     )pbdoc")
         .def(py::init<>(), R"pbdoc(
@@ -170,12 +56,23 @@ PYBIND11_MODULE(fastmm, m)
             Use add_edge() to populate the network with road segments, then call
             build_rtree_index() to prepare it for map matching.
         )pbdoc")
-        .def("add_edge", &Network::add_edge,
-             py::arg("edge_id"),
-             py::arg("source"),
-             py::arg("target"),
-             py::arg("geom"),
-             py::arg("speed") = std::nullopt,
+        .def("add_edge", [](Network &self, int edge_id, int source, int target, py::list coords, std::optional<double> speed)
+             {
+            LineString geom;
+            for (auto item : coords) {
+                if (py::isinstance<py::tuple>(item) && py::len(item) == 2) {
+                    py::tuple tup = item.cast<py::tuple>();
+                    double x = py::float_(tup[0]);
+                    double y = py::float_(tup[1]);
+                    geom.add_point(x, y);
+                } else {
+                    throw std::runtime_error("Each coordinate must be a tuple (x, y)");
+                }
+            }
+            if (geom.get_num_points() < 2) {
+                throw std::runtime_error("Edge geometry must have at least 2 points");
+            }
+            self.add_edge(edge_id, source, target, geom, speed); }, py::arg("edge_id"), py::arg("source"), py::arg("target"), py::arg("geom"), py::arg("speed") = std::nullopt,
              R"pbdoc(
             Add a directed edge (road segment) to the network.
 
@@ -186,12 +83,15 @@ PYBIND11_MODULE(fastmm, m)
                 edge_id: Unique integer identifier for this edge
                 source: Node ID where the edge starts
                 target: Node ID where the edge ends
-                geom: LineString defining the edge's spatial geometry
+                geom: List of (x, y) tuples defining the edge geometry (minimum 2 points)
                 speed: Optional speed value (distance units per time unit).
                        Required if using TransitionMode.FASTEST routing.
 
             Note:
                 Call build_rtree_index() after adding all edges.
+
+            Example:
+                >>> network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50.0)
         )pbdoc")
         .def("build_rtree_index", &Network::build_rtree_index,
              R"pbdoc(

@@ -64,7 +64,7 @@ if ($LASTEXITCODE -eq 0) {
     if ($Install) {
         # Install wheel (skip dependencies to save time)
         Write-Host "`nInstalling wheel..." -ForegroundColor Green
-        $wheel = Get-ChildItem dist\*.whl | Select-Object -First 1
+        $wheel = Get-ChildItem dist\*.whl | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         pip install --force-reinstall --no-deps $wheel.FullName
         python -c "import fastmm; print('fastmm version:', fastmm.__version__)"
     } else {
