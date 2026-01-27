@@ -135,6 +135,18 @@ class TestTrajectoryCreation:
         assert xyt_tuples[0] == (0, 0, 5)
         assert xyt_tuples[1] == (100, 0, 10)
 
+    def test_trajectory_with_decreasing_timestamps_fails(self):
+        """Test that creating trajectory with non-increasing timestamps fails."""
+        with pytest.raises(ValueError, match="non-decreasing"):
+            fastmm.Trajectory.from_xyt_tuples(1, [(0, 0, 10), (100, 0, 5), (200, 0, 15)])
+
+    def test_trajectory_with_equal_timestamps_succeeds(self):
+        """Test that trajectory with equal consecutive timestamps is allowed."""
+        # Non-decreasing means t[i] <= t[i+1], so equal timestamps are OK
+        traj = fastmm.Trajectory.from_xyt_tuples(1, [(0, 0, 10), (100, 0, 10), (200, 0, 15)])
+        assert traj.id == 1
+        assert len(traj) == 3
+
 
 class TestNetworkGraph:
     """Test network graph creation with different routing modes."""
