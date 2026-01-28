@@ -27,10 +27,10 @@ namespace FASTMM
      */
     struct Trajectory
     {
-      Trajectory() {};
-      Trajectory(int id_arg, const LineString &geom_arg) : id(id_arg), geom(geom_arg) {};
+      Trajectory() : has_timestamps_(false) {};
+      Trajectory(int id_arg, const LineString &geom_arg) : id(id_arg), geom(geom_arg), has_timestamps_(false) {};
       Trajectory(int id_arg, const LineString &geom_arg, const std::vector<double> &timestamps_arg)
-          : id(id_arg), geom(geom_arg), timestamps(timestamps_arg)
+          : id(id_arg), geom(geom_arg), timestamps(timestamps_arg), has_timestamps_(true)
       {
         if (geom.get_num_points() != static_cast<int>(timestamps.size()))
         {
@@ -48,6 +48,11 @@ namespace FASTMM
       int id;                         /**< Id of the trajectory */
       LineString geom;                /**< Geometry of the trajectory */
       std::vector<double> timestamps; /**< Timestamps of the trajectory */
+
+      bool has_timestamps() const
+      {
+        return has_timestamps_;
+      }
 
       // Return the number of points in the trajectory
       int size() const
@@ -107,6 +112,9 @@ namespace FASTMM
         }
         return data;
       }
+
+    protected:
+      bool has_timestamps_;
     };
 
   }

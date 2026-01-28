@@ -201,6 +201,12 @@ namespace FASTMM
        */
       std::string compute_hash() const;
 
+      /**
+       * Whether all edges have speed values
+       * @return true if all edges have speed, false if any edge lacks speed
+       */
+      bool all_edges_have_speed() const;
+
     private:
       /**
        * Concatenate a linestring segs to a linestring line, used in the
@@ -221,7 +227,7 @@ namespace FASTMM
       NodeIndexMap node_map;
       EdgeIndexMap edge_map;
       std::vector<FASTMM::CORE::Point> vertex_points;
-      bool all_edges_have_speed = true; // True if all edges have speed, false if any edge lacks speed
+      bool _all_edges_have_speed = true; // True if all edges have speed, false if any edge lacks speed
     };
   }
 }

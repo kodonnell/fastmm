@@ -63,7 +63,7 @@ void Network::add_edge(EdgeID edge_id, NodeID source, NodeID target,
   }
   else
   {
-    all_edges_have_speed = false;
+    _all_edges_have_speed = false;
   }
 
   NodeIndex s_idx, t_idx;
@@ -104,6 +104,11 @@ int Network::get_node_count() const
 int Network::get_edge_count() const
 {
   return edges.size();
+}
+
+bool Network::all_edges_have_speed() const
+{
+  return _all_edges_have_speed;
 }
 
 // Get the edge vector

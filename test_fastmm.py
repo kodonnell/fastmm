@@ -203,6 +203,7 @@ class TestShortestVsFastest:
         # Extract route
         all_edges = []
         for segment in result.segments:
+            print(segment)
             for edge in segment.edges:
                 all_edges.append(edge.edge_id)
                 print(edge.points)

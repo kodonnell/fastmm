@@ -82,9 +82,11 @@ matcher = fastmm.MapMatcher(
 # The rest is the same...
 ```
 
-
 ## TODO
 
+- tidy readme
+- xyt if no t provided has t = 0, when probably should be null.
+- test the time apportioning.
 - unused
 - If not found in UBODT, instead of bailing, do a normal djikstra lookup.
 - max_distance_between_candidates is not a hard limit in UBODT ... I think. Test this, and if needed, add an extra check.
@@ -92,7 +94,7 @@ matcher = fastmm.MapMatcher(
 
 ### Automatic Trajectory Splitting
 
-For trajectories that might have gaps or failures, use `pymatch_trajectory_split()` which automatically handles:
+For trajectories that might have gaps or failures, use `match()` which automatically handles:
 - Points with no nearby road candidates (e.g., in tunnels, off-network)
 - Disconnected route segments (e.g., GPS jumps, teleportation)
 - Returns only the successfully matched portions

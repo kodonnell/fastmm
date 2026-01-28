@@ -167,6 +167,11 @@ PYBIND11_MODULE(fastmm, m)
     )pbdoc")
         .def_readonly("x", &PyMatchPoint::x, "X coordinate of the matched point")
         .def_readonly("y", &PyMatchPoint::y, "Y coordinate of the matched point")
+        .def_readonly("d", &PyMatchPoint::d,
+                      "Distance from the previous matched point along the edge (coordinate units)")
+        .def_readonly("t", &PyMatchPoint::t, "Timestamp of the matched point (if inputs have time and network has speed")
+        .def_readonly("speed", &PyMatchPoint::speed,
+                      "Speed at this matched point (if network edges have speed values)")
         .def_readonly("edge_offset", &PyMatchPoint::edge_offset,
                       "Distance from the start of the edge to this point (coordinate units)")
         .def_readonly("cumulative_distance", &PyMatchPoint::cumulative_distance,
@@ -174,6 +179,9 @@ PYBIND11_MODULE(fastmm, m)
         .def("__repr__", [](const PyMatchPoint &p)
              { return "<P x=" + fmt::format("{:.1f}", p.x) +
                       " y=" + fmt::format("{:.1f}", p.y) +
+                      " d=" + fmt::format("{:.1f}", p.d) +
+                      fmt::format(" t={}", p.t.has_value() ? fmt::format("{:.1f}", p.t.value()) : "null") +
+                      " speed=" + (p.speed.has_value() ? fmt::format("{:.1f}", p.speed.value()) : "null") +
                       " edge_offset=" + fmt::format("{:.1f}", p.edge_offset) +
                       " cumulative_distance=" + fmt::format("{:.1f}", p.cumulative_distance) + ">"; });
 
@@ -231,8 +239,8 @@ PYBIND11_MODULE(fastmm, m)
         .def_readonly("edges", &PyMatchSegment::edges,
                       "List of PyMatchSegmentEdge objects forming the path from p0 to p1")
         .def("__repr__", [](const PyMatchSegment &s)
-             { return "<Segment from (" + fmt::format("{:.1f}", s.p0.x) + ", " + fmt::format("{:.1f}", s.p0.y) +
-                      ") to (" + fmt::format("{:.1f}", s.p1.x) + ", " + fmt::format("{:.1f}", s.p1.y) +
+             { return "<Segment from (" + fmt::format("{:.1f}", s.p0.x) + ", " + fmt::format("{:.1f}", s.p0.y) + ", " + fmt::format("{:.1f}", s.p0.t) +
+                      ") to (" + fmt::format("{:.1f}", s.p1.x) + ", " + fmt::format("{:.1f}", s.p1.y) + ", " + fmt::format("{:.1f}", s.p1.t) +
                       ") with " + std::to_string(s.edges.size()) + " edges>"; });
 
     // PyMatchResult struct
@@ -322,6 +330,17 @@ PYBIND11_MODULE(fastmm, m)
                        "Unique integer identifier for this trajectory")
         .def("__len__", [](const Trajectory &self)
              { return self.geom.get_num_points(); }, "Number of GPS observation points in the trajectory")
+        .def("__repr__", [](const Trajectory &self)
+             { return "<Trajectory id=" + std::to_string(self.id) +
+                      " num_points=" + std::to_string(self.geom.get_num_points()) +
+                      (self.has_timestamps() ? " with timestamps" : " no timestamps") + ">"; })
+        .def("has_timestamps", &Trajectory::has_timestamps,
+             R"pbdoc(
+            Check if the trajectory has timestamps.
+
+            Returns:
+                bool: True if timestamps are present, False otherwise
+        )pbdoc")
         .def("to_xyt_tuples", [](const Trajectory &self)
              {
             py::list tuples;

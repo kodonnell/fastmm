@@ -626,17 +626,19 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
         int traj_idx_0 = start_idx + i - 1;
         int traj_idx_1 = start_idx + i;
 
+        const double t0 = trajectory.has_timestamps() ? trajectory.timestamps[traj_idx_0] : 0.0;
         const PyMatchCandidate start_candidate = {
             boost::geometry::get<0>(mc0.c.point),
             boost::geometry::get<1>(mc0.c.point),
-            trajectory.timestamps.empty() ? 0.0 : trajectory.timestamps[traj_idx_0],
+            t0,
             mc0.c.dist,
             mc0.c.offset};
 
+        const double t1 = trajectory.has_timestamps() ? trajectory.timestamps[traj_idx_1] : 0.0;
         const PyMatchCandidate end_candidate = {
             boost::geometry::get<0>(mc1.c.point),
             boost::geometry::get<1>(mc1.c.point),
-            trajectory.timestamps.empty() ? 0.0 : trajectory.timestamps[traj_idx_1],
+            t1,
             mc1.c.dist,
             mc1.c.offset};
 
@@ -655,9 +657,12 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
 
             for (int j = 0; j < line.get_num_points(); ++j)
             {
+                double d = distances[j - 1];
                 if (j > 0)
-                    cumulative_distance += distances[j - 1];
-                points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
+                {
+                    cumulative_distance += d;
+                }
+                points.push_back({line.get_x(j), line.get_y(j), d, std::nullopt, e0.speed, cumulative_distance - start_distance, cumulative_distance});
             }
             segment.edges.push_back({edge_id, points, is_reversed});
         }
@@ -665,17 +670,20 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
         {
             // Multiple edges - first edge
             EdgeID edge_id = complete_path[start_edge_index];
-            const Edge &e0 = network_.get_edge(edge_id);
-            FASTMM::CORE::LineString line = ALGORITHM::cutoffseg_unique(e0.geom, mc0.c.offset, e0.length);
+            Edge e = network_.get_edge(edge_id);
+            FASTMM::CORE::LineString line = ALGORITHM::cutoffseg_unique(e.geom, mc0.c.offset, e.length);
             std::vector<double> distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
             std::vector<PyMatchPoint> points;
             double start_distance = cumulative_distance;
-
+            double d;
             for (int j = 0; j < line.get_num_points(); ++j)
             {
+                d = distances[j - 1];
                 if (j > 0)
-                    cumulative_distance += distances[j - 1];
-                points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
+                {
+                    cumulative_distance += d;
+                }
+                points.push_back({line.get_x(j), line.get_y(j), d, std::nullopt, e.speed, cumulative_distance - start_distance, cumulative_distance});
             }
             segment.edges.push_back({edge_id, points, false});
 
@@ -683,37 +691,114 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
             for (int j = start_edge_index + 1; j < end_edge_index; ++j)
             {
                 edge_id = complete_path[j];
-                line = network_.get_edge(edge_id).geom;
+                e = network_.get_edge(edge_id);
+                line = e.geom;
                 distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
                 points.clear();
                 start_distance = cumulative_distance;
 
                 for (int k = 0; k < line.get_num_points(); ++k)
                 {
+                    d = distances[k - 1];
                     if (k > 0)
-                        cumulative_distance += distances[k - 1];
-                    points.push_back({line.get_x(k), line.get_y(k), cumulative_distance - start_distance, cumulative_distance});
+                    {
+                        cumulative_distance += d;
+                    }
+                    points.push_back({line.get_x(k), line.get_y(k), d, std::nullopt, e.speed, cumulative_distance - start_distance, cumulative_distance});
                 }
                 segment.edges.push_back({edge_id, points, false});
             }
 
             // Last edge
             edge_id = complete_path[end_edge_index];
-            const Edge &e1 = network_.get_edge(edge_id);
-            line = ALGORITHM::cutoffseg_unique(e1.geom, 0, mc1.c.offset);
+            e = network_.get_edge(edge_id);
+            line = ALGORITHM::cutoffseg_unique(e.geom, 0, mc1.c.offset);
             distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
             points.clear();
             start_distance = cumulative_distance;
 
             for (int j = 0; j < line.get_num_points(); ++j)
             {
+                d = distances[j - 1];
                 if (j > 0)
-                    cumulative_distance += distances[j - 1];
-                points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
+                {
+                    cumulative_distance += d;
+                }
+                points.push_back({line.get_x(j), line.get_y(j), d, std::nullopt, e.speed, cumulative_distance - start_distance, cumulative_distance});
             }
             segment.edges.push_back({edge_id, points, false});
         }
 
+        // OK, great, we can now apportion the time appropriately along the segment:
+        if (trajectory.has_timestamps())
+        {
+            if (network_.all_edges_have_speed())
+            {
+                // We've got speed, so apportion the time t0 -> t1 according to expected travel time along the segment
+                double total_expected_time = 0;
+                for (const auto &edge : segment.edges)
+                {
+                    for (const auto &point : edge.points)
+                    {
+                        total_expected_time += point.d / point.speed.value();
+                    }
+                }
+
+                // OK, cool, now go updating times:
+                double cumulative_expected_time = 0;
+                for (int edge_idx = 0; edge_idx < segment.edges.size(); ++edge_idx)
+                {
+                    auto &edge = segment.edges[edge_idx];
+                    for (int point_idx = 0; point_idx < edge.points.size(); ++point_idx)
+                    {
+                        auto &point = edge.points[point_idx];
+                        if (edge_idx == 0 && point_idx == 0)
+                        {
+                            // First point - use original timestamp
+                            point.t = t0;
+                        }
+                        else
+                        {
+                            cumulative_expected_time += point.d / point.speed.value();
+                            point.t = t0 + cumulative_expected_time / total_expected_time * (t1 - t0);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // OK, we don't have speeds, so just linearly interpolate time along the segment according to distance
+
+                // Get total distance of segment - subtract last point from last edge from first point of first edge
+                double total_segment_distance = 0;
+                for (const auto &edge : segment.edges)
+                {
+                    for (const auto &point : edge.points)
+                    {
+                        total_segment_distance += point.d;
+                    }
+                }
+                double cumulative_segment_distance = 0;
+                for (int edge_idx = 0; edge_idx < segment.edges.size(); ++edge_idx)
+                {
+                    auto &edge = segment.edges[edge_idx];
+                    for (int point_idx = 0; point_idx < edge.points.size(); ++point_idx)
+                    {
+                        auto &point = edge.points[point_idx];
+                        if (edge_idx == 0 && point_idx == 0)
+                        {
+                            // First point - use original timestamp
+                            point.t = t0;
+                        }
+                        else
+                        {
+                            cumulative_segment_distance += point.d;
+                            point.t = t0 + (cumulative_segment_distance / total_segment_distance) * (t1 - t0);
+                        }
+                    }
+                }
+            }
+        }
         segments.push_back(segment);
     }
 
