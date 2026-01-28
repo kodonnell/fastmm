@@ -54,10 +54,10 @@ namespace FASTMM
       NodeIndex source;              /**< Source node index */
       NodeIndex target;              /**< Target node index */
       double length;                 /**< Length of the edge polyline */
-      std::optional<double> speed;   /**< Speed limit on the edge (optional) */
+      double speed;                  /**< Speed limit on the edge (-1 if unknown). Must be > 0. */
       FASTMM::CORE::LineString geom; /**< The edge geometry */
     };
 
-  } // NETWORK
-} // MM
-#endif /* MM_TYPES_HPP */
+  }
+}
+#endif

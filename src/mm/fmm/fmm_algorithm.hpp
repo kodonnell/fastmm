@@ -31,7 +31,7 @@ namespace FASTMM
     {
       /**
        * Constructor of FastMapMatch configuration
-       * @param k_arg the number of candidates
+       * @param max_candidates the max number of candidates for each GPS point
        * @param candidate_search_radius the search radius, in map unit, which is the same as
        * GPS data and network data.
        * @param gps_error the gps error, in map unit
@@ -39,13 +39,13 @@ namespace FASTMM
        * @param transition_mode routing mode (SHORTEST or FASTEST)
        * @param reference_speed reference speed for FASTEST mode (required if mode is FASTEST)
        */
-      FastMapMatchConfig(int k_arg = 8,
+      FastMapMatchConfig(int max_candidates = 8,
                          double candidate_search_radius = 50,
                          double gps_error = 50,
                          double reverse_tolerance = 0.0,
                          TransitionMode transition_mode = TransitionMode::SHORTEST,
                          std::optional<double> reference_speed = std::nullopt);
-      int k;                                 /**< Number of candidates */
+      int max_candidates;                    /**< Number of candidates */
       double candidate_search_radius;        /**< Search radius, in map unit*/
       double gps_error;                      /**< GPS error, in map unit */
       double reverse_tolerance;              /**< Reverse tolerance, in map unit */

@@ -6,20 +6,21 @@ It's based on a desire to map match a lot of vehicle trace data quickly, without
 
 It is based on <https://github.com/cyang-kth/fmm> but updated to:
 
+- Include Python helper classes for automatic trajectory splitting and time interpolation for the match.
 - Remove GDAL/OGR dependencies - networks are created programmatically from Python
-- Include Python helper classes for automatic trajectory splitting and time interpolation
 - Be buildable on Windows/Linux/Mac with modern tooling
 - Focus on Python packaging with distributable wheels
 - Remove STMatch - we'll focus on FMM for now
+- Automated windows, linux, and macOS wheel builds
 
-**Status:**
+## TODO
 
-- [x] Tested ... = )
-- [x] MapMatcher helper class with auto-splitting and time interpolation
-- [x] FASTMM algorithm working
-- [x] Python API for network creation and matching
-- [x] Windows, linux, and macOS wheel builds
-
+- currently if a point from GPS trace fails (too far etc.) it's excluded from match. Should add it to match just with start == end and appropriate error code.
+- For reverse_tolerance, why not, if the movement is < reverse tolerance, just assume they're still at the same place (and it's GPS jitter)?
+- test the time apportioning.
+- If not found in UBODT, instead of bailing, do a normal djikstra lookup.
+- max_distance_between_candidates is not a hard limit in UBODT ... I think. Test this, and if needed, add an extra check.
+- Specify versions for build libs (e.g. cibuildwheel).
 
 ## Installation
 
@@ -29,100 +30,52 @@ pip install fastmm
 
 ## Quick Start (Recommended)
 
-The simplest way to use fastmm is with the high-level `MapMatcher` class:
+The simplest way to use fastmm is with the high-level `FastMapMatch` class:
 
 ```python
-import fastmm
+from fastmm import FastMapMatch, MatchErrorCode, Network, Trajectory, TransitionMode, FastMapMatchConfig
 
 # Create and populate network
-network = fastmm.Network()
+network = Network()
 network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
 network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
 network.finalize()
 
 # Create matcher with automatic UBODT caching (SHORTEST mode - distance-based)
-matcher = fastmm.MapMatcher(
-    network=network,
-    mode=fastmm.TransitionMode.SHORTEST,
-    max_distance_between_candidates=300.0,  # meters (2-3x expected GPS spacing)
-    cache_dir="./cache"  # UBODT cached here, auto-regenerated if network changes
+matcher = FastMapMatch(
+    network, TransitionMode.SHORTEST, max_distance_between_candidates=300.0, cache_dir="./cache"
 )
 
-# Match a trajectory
-config = fastmm.FastMapMatchConfig(k=8, candidate_search_radius=50, gps_error=50)
-trajectory = fastmm.Trajectory.from_xy_tuples(1, [(10, 0), (50, 0), (150, 0)])
-result = matcher.model.pymatch_trajectory(trajectory, config)
-
-if result.error_code == fastmm.MatchErrorCode.SUCCESS:
-    for segment in result.segments:
-        print(f"Segment from {segment.p0} to {segment.p1}")
-        for edge in segment.edges:
-            print(f"  Edge {edge.edge_id} with {len(edge.points)} points")
-```
-
-### FASTEST Mode (Time-Based Routing)
-
-For time-based routing (requires speed on all edges):
-
-```python
-# Add edges with speed information
-network = fastmm.Network()
-network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=13.9)  # 50 km/h
-network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)], speed=13.9)
-network.finalize()
-
-# Create matcher with FASTEST mode
-matcher = fastmm.MapMatcher(
-    network=network,
-    mode=fastmm.TransitionMode.FASTEST,
-    max_time_between_candidates=20.0,  # seconds (2-3x expected travel time between GPS points)
-    cache_dir="./cache"
+# Match a trajectory (automatic splitting)
+trajectory = Trajectory.from_xy_tuples(1, [(10, 0), (50, 0), (150, 0)])
+result = matcher.match(
+    trajectory,
+    max_candidates=8,
+    candidate_search_radius=50,
+    gps_error=50
 )
-
-# The rest is the same...
-```
-
-## TODO
-
-- tidy readme
-- currently if a point from GPS trace fails (too far etc.) it's excluded from match. Should add it to match just with start == end and appropriate error code.
-- xyt if no t provided has t = 0, when probably should be null.
-- test the time apportioning.
-- If not found in UBODT, instead of bailing, do a normal djikstra lookup.
-- max_distance_between_candidates is not a hard limit in UBODT ... I think. Test this, and if needed, add an extra check.
-- Specify versions for build libs (e.g. cibuildwheel).
-
-### Automatic Trajectory Splitting
-
-For trajectories that might have gaps or failures, use `match()` which automatically handles:
-- Points with no nearby road candidates (e.g., in tunnels, off-network)
-- Disconnected route segments (e.g., GPS jumps, teleportation)
-- Returns only the successfully matched portions
-
-```python
-# Same network/matcher setup as above...
-
-# Match with automatic splitting
-trajectory = fastmm.Trajectory.from_xy_tuples(1, [
-    (10, 0),    # Point 0
-    (50, 0),    # Point 1
-    (100, 500), # Point 2 - far from network, will be skipped
-    (150, 0),   # Point 3
-    (180, 0),   # Point 4
-])
-result = matcher.pymatch_trajectory_split(trajectory, config)
 
 # Process successful sub-trajectories
 for sub in result.subtrajectories:
-    print(f"Matched points {sub.start_index} to {sub.end_index}")
-    for segment in sub.segments:
-        print(f"  Segment with {len(segment.edges)} edges")
+    if sub.error_code == MatchErrorCode.SUCCESS:
+        print(f"Matched points {sub.start_index} to {sub.end_index}")
+        for segment in sub.segments:
+            print(f"  Segment from {segment.p0} to {segment.p1}")
+            for edge in segment.edges:
+                print(f"    Edge {edge.edge_id} with {len(edge.points)} points")
 ```
 
-**Benefits of split matching:**
-- **Performance**: Candidate search done once for all points, then reused across sub-trajectories
-- **Automatic recovery**: Continues matching after failures instead of giving up
-- **Simplicity**: No manual trajectory splitting or error handling needed
+For time-based routing you simply add a speed on all edges, and use `TransitionMode.FASTEST`. Otherwise it's the same.
+
+## Automatic Trajectory Splitting
+
+For trajectories that might have gaps or failures, `match()` automatically filters out troublesome sections, and matches everything it can. That is:
+- It ignores points with no nearby road candidates (e.g., in tunnels, off-network) - it just returns the map matched sections either side of the erroneous point. (You can choose to merge them yourself later if you want.)
+- If there's a break in the matching due to e.g. a very long distance between two points (data issues, teleportation etc.) then again, it'll return the map matches sections either side of this gap.
+
+## Interpolating time
+
+If your trajectory has timestamps, you often want your resulting match to include time as well i.e. show you at what speed/time your vehicle moved along the matched geometry. This library returns this. If your network doesn't have speed, it just apportions the time along the matched geometry between two GPS linearly. If you have speed, it uses this correctly e.g. if the match segment concludes a 100km/hr edge and a 50km/hr of equal length, it'll apportion less time on the faster edge than on the slower edge.
 
 ## Understanding Delta Parameters
 
@@ -146,7 +99,7 @@ The `delta` parameter (called `max_distance_between_candidates` or `max_time_bet
 
 ## Understanding Reverse Tolerance
 
-The `reverse_tolerance` parameter handles GPS measurement noise that causes slight backward movement on the **same edge**. This is different from edge direction:
+The `reverse_tolerance` parameter handles GPS measurement noise that causes slight backward movement on the **same edge**. This is even though we're operating on *directed* edges already - it's to account for a bit of GPS error etc. e.g. if the GPS goes backward. Without this, our routing would work - it'd just end up matching to the other side of the road, which would mean the route would go to the end of the road then back down to the current position (but on the other edge) ... which means if they're stationary and the GPS is jumping, it could look like the vehicle is traveling up and down the street a lot.
 
 ### How It Works
 
@@ -196,151 +149,37 @@ for segment in result.segments:
 - Quality control (detecting erratic GPS behavior)
 - Statistics (counting backward movements)
 - Debugging (understanding matching behavior)
-```
 
 ### Recommendations
 
-**For OSM Networks (bidirectional edges):**
-- Use `reverse_tolerance=0.0` (default) to avoid fake U-turns
-- GPS noise is better handled by `gps_error` and trajectory splitting
-- Real backward movement should match to the opposite-direction edge
-
-**For Stationary/Slow Vehicles:**
-- Consider `reverse_tolerance=20` (20m assuming in Euclidean system)  to handle GPS jitter
-- Check `edge.reversed` flag in Python to handle geometry correctly
-- May need post-processing to detect oscillating matches
+Start with `reverse_tolerance=0`. If you're seeing a lot of jumping around on stationary (ish) vehicles, either do some pre-filtering, or try e.g. `reverse_tolerance=20m`.
 
 ## Routing Modes: SHORTEST vs FASTEST
 
-FastMM supports two routing modes that affect how map matching selects the most likely path. The mode must be specified when creating the graph and UBODT, and is automatically validated when using `MapMatcher`.
+FastMM supports two routing modes that affect how map matching selects the most likely path.
+
+In both cases, the emission probability is balanced with the transition probability. The emission probability is the likelihood a candidate is on the given edge based simply on how far away it is from the edge - the closer, the higher the probability. This can be controlled with the `gps_error` parameter - make it larger and the emission probability will stay higher even if the point is further away.
 
 ### SHORTEST Mode (Distance-based)
 
-Uses distance as the routing metric. This is the default mode and matches trajectories based on spatial proximity.
+Uses distance as the routing metric. This is the default mode and matches trajectories based on spatial proximity. The transition probability is:
 
-```python
-import fastmm
-
-# Create network with SHORTEST mode (default)
-network = fastmm.Network()
-network.add_edge(edge_id=1, source=1, target=2, geom=linestring)
-network.finalize()
-
-# Create graph for distance-based routing
-graph = fastmm.NetworkGraph(network, mode=fastmm.TransitionMode.SHORTEST)
-
-# Configure matcher (SHORTEST is default)
-config = fastmm.FastMapMatchConfig(
-    k=8,
-    candidate_search_radius=50,
-    gps_error=50,
-    transition_mode=fastmm.TransitionMode.SHORTEST
-)
-```
-
-**Transition Probability Calculation (SHORTEST):**
 ```
 tp = min(euclidean_dist, path_dist) / max(euclidean_dist, path_dist)
 ```
 
 This compares the straight-line distance between GPS points to the network path distance. Higher probability when the path closely follows the GPS trajectory.
 
-**Practical Effect:** Prefers routes that minimize total distance, even if they involve slower roads. Best for pedestrian tracking, cycling, or when speed data is unavailable.
+If you find your routes are sticking to the nearest edge, regardless of the feasibility of the route, this is because your `gps_error` is likely too large (?). Likewise the converse.
 
 ### FASTEST Mode (Time-based)
 
-Uses travel time as the routing metric. Requires speed values on all edges.
+Uses travel time as the routing metric. Requires speed values on all edges. The transition probability is
 
-```python
-import fastmm
-
-# Create network with speed on edges
-network = fastmm.Network()
-network.add_edge(edge_id=1, source=1, target=2, geom=linestring, speed=50.0)  # speed in units/time
-network.add_edge(edge_id=2, source=2, target=3, geom=linestring2, speed=30.0)
-network.finalize()
-
-# Create graph for time-based routing
-graph = fastmm.NetworkGraph(network, mode=fastmm.TransitionMode.FASTEST)
-
-# Configure matcher with reference speed
-config = fastmm.FastMapMatchConfig(
-    k=8,
-    candidate_search_radius=50,
-    gps_error=50,
-    transition_mode=fastmm.TransitionMode.FASTEST,
-    reference_speed=40.0  # Expected travel speed (required for FASTEST)
-)
-```
-
-**Transition Probability Calculation (FASTEST):**
 ```
 expected_time = euclidean_dist / reference_speed
 actual_time = path_time (sum of segment_length / segment_speed)
 tp = min(expected_time, actual_time) / max(expected_time, actual_time)
 ```
 
-This compares the expected time (if traveling straight at reference speed) to the actual time needed to traverse the network path.
-
-**Practical Effect:** Prefers faster routes (highways, arterials) over slower alternatives, even if slightly longer. Best for vehicle tracking where drivers optimize for time, not distance.
-
-### Important Notes
-
-- **FASTEST mode requires speed on ALL edges** - the system will throw an error at graph construction if any edge lacks a speed value
-- **Separate UBODTs needed** - Generate separate UBODT files for each mode, as they store different costs (distance vs time)
-  - `MapMatcher` handles this automatically through cache file naming
-  - Manual API users must generate separate UBODT files with different `delta` values and filenames
-- **Mode validation** - New UBODT files (v1+) include metadata that validates mode compatibility
-  - `MapMatcher` automatically validates mode when loading cached UBODT
-  - Manual API: use validation via `UBODT.get_mode()` after `read_ubodt()`
-- Both modes use the same emission probability (based on GPS accuracy) but differ in transition probability calculation
-
-### Understanding Reference Speed
-
-**What is reference_speed?**
-
-The `reference_speed` parameter represents the expected average speed at which a vehicle would travel in a straight line between GPS observation points, **if it could ignore the road network**. It's used exclusively in FASTEST mode to calculate expected travel times.
-
-**How it affects matching:**
-
-In FASTEST mode, the transition probability between two GPS points compares:
-- **Expected time**: How long would it take to travel the straight-line distance at `reference_speed`
-- **Actual time**: How long does the matched network path take (sum of edge_length/edge_speed for each edge)
-
-The probability is higher when these times are similar: `tp = min(expected, actual) / max(expected, actual)`
-
-**Choosing the right value:**
-
-- **Lower values (e.g., 20-30)**:
-  - Makes the algorithm expect slower straight-line travel
-  - Increases expected_time, making actual network paths look relatively faster
-  - **Effect**: Encourages following the road network more closely, even if it means taking detours
-  - **Good for**: Dense urban areas, congested traffic, routes with many turns
-
-- **Higher values (e.g., 60-80)**:
-  - Makes the algorithm expect faster straight-line travel
-  - Decreases expected_time, making actual network paths look relatively slower
-  - **Effect**: More tolerant of GPS points that "cut corners" or skip parts of the route
-  - **Good for**: Highway driving, rural areas, trajectories with sparse GPS sampling
-
-- **Typical values (e.g., 40-50)**:
-  - Match the average actual vehicle speed in your dataset
-  - A good starting point for mixed urban/suburban driving
-  - Should be close to the typical speeds on your network edges
-
-**Practical Example:**
-
-Imagine two GPS points 100 meters apart (straight-line):
-- Network path: follows roads for 120 meters through edges with average speed 50
-- Actual time on network: 120m / 50 = 2.4 time units
-
-With `reference_speed=40`:
-- Expected time: 100m / 40 = 2.5 time units
-- Transition probability: min(2.5, 2.4) / max(2.5, 2.4) = 2.4/2.5 = **0.96** (high - good match!)
-
-With `reference_speed=60`:
-- Expected time: 100m / 60 = 1.67 time units
-- Transition probability: min(1.67, 2.4) / max(1.67, 2.4) = 1.67/2.4 = **0.70** (lower - penalizes this path)
-
-**Rule of thumb**: Set `reference_speed` close to the average speed in your network. If matching is too "sticky" to routes (not handling shortcuts well), increase it. If matching is too loose (taking implausible shortcuts), decrease it.
-
+Similarly to above, this gives a higher priority when the travel time is the same, or faster than the expected travel time (which is the euclidean distance divided by the reference speed). If you're finding your routes are sticking to the nearest edge, regardless of the feasibility of the route, either decrease `gps_error` as above, or decrease (?) the reference speed.

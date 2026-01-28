@@ -98,13 +98,13 @@ namespace FASTMM
 
     struct PyMatchPoint
     {
-      double x;                    //**< x coordinate */
-      double y;                    //**< y coordinate */
-      double d;                    //**< Distance from previous point along the edge */
-      std::optional<double> t;     //**< Infer the time at this point if possible. Speeds are used if available. */
-      std::optional<double> speed; //**< Speed at this point (from edge), if available */
-      double edge_offset;          //**< Offset from start of edge */
-      double cumulative_distance;  //**< Cumulative distance along the matched path */
+      double x;                   //**< x coordinate */
+      double y;                   //**< y coordinate */
+      double d;                   //**< Distance from previous point along the edge */
+      double t;                   //**< Infer the time at this point if possible. Speeds are used if available. -1 if unknown */
+      double speed;               //**< Speed at this point (from edge), if available, -1 if unknown */
+      double edge_offset;         //**< Offset from start of edge */
+      double cumulative_distance; //**< Cumulative distance along the matched path */
     };
 
     struct PyMatchSegmentEdge
@@ -118,7 +118,7 @@ namespace FASTMM
     {
       double x;
       double y;
-      double t;
+      double t; //**< Timestamp or time value, -1 if unknown */
       double perpendicular_distance_to_matched_geometry;
       double offset_from_start_of_edge;
     };

@@ -33,9 +33,9 @@ NetworkGraph::NetworkGraph(const Network &network_arg, TransitionMode mode) : ne
     if (mode == TransitionMode::FASTEST)
     {
       // Time-based: cost = distance / speed
-      if (edge.speed.has_value())
+      if (edge.speed > 0)
       {
-        g[e].cost = edge.length / edge.speed.value();
+        g[e].cost = edge.length / edge.speed;
       }
       else
       {

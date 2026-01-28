@@ -28,7 +28,13 @@ namespace FASTMM
     struct Trajectory
     {
       Trajectory() : has_timestamps_(false) {};
-      Trajectory(int id_arg, const LineString &geom_arg) : id(id_arg), geom(geom_arg), has_timestamps_(false) {};
+      Trajectory(int id_arg, const LineString &geom_arg) : id(id_arg), geom(geom_arg), has_timestamps_(false)
+      {
+        if (geom.get_num_points() == 0)
+        {
+          throw std::invalid_argument("Trajectory: must have at least one point!");
+        }
+      };
       Trajectory(int id_arg, const LineString &geom_arg, const std::vector<double> &timestamps_arg)
           : id(id_arg), geom(geom_arg), timestamps(timestamps_arg), has_timestamps_(true)
       {
@@ -36,13 +42,25 @@ namespace FASTMM
         {
           throw std::invalid_argument("Trajectory: timestamps and geometry must have the same length");
         }
-        // Ensure timestamps are sorted
+        if (geom.get_num_points() == 0)
+        {
+          throw std::invalid_argument("Trajectory: must have at least one point/timestamp!");
+        }
+
+        // Ensure timestamps are sorted and > 0:
+        double prev_t = timestamps[0];
         for (size_t i = 1; i < timestamps.size(); ++i)
         {
-          if (timestamps[i] < timestamps[i - 1])
+          double t = timestamps[i];
+          if (t < 0)
+          {
+            throw std::invalid_argument("Trajectory: timestamps must be non-negative");
+          }
+          if (t < prev_t)
           {
             throw std::invalid_argument("Trajectory: timestamps must be non-decreasing");
           }
+          prev_t = t;
         }
       }
       int id;                         /**< Id of the trajectory */
@@ -60,7 +78,7 @@ namespace FASTMM
         return geom.get_num_points();
       }
 
-      // Create a Trajectory from a vector of (x, y, t) tuples
+      // Create a Trajectory from a vector of (x, y) tuples
       static Trajectory from_xy_tuples(int id, const std::vector<std::tuple<double, double>> &data)
       {
         LineString geom;
@@ -87,13 +105,17 @@ namespace FASTMM
       // Return as a vector of (x, y, t) tuples
       std::vector<std::tuple<double, double, double>> to_xyt_tuples() const
       {
+        if (!has_timestamps_)
+        {
+          throw std::runtime_error("Trajectory::to_xyt_tuples: trajectory has no timestamps");
+        }
         std::vector<std::tuple<double, double, double>> data;
         int n = geom.get_num_points();
         for (int i = 0; i < n; ++i)
         {
           double x = geom.get_x(i);
           double y = geom.get_y(i);
-          double t = (i < timestamps.size()) ? timestamps[i] : 0.0;
+          double t = timestamps[i];
           data.emplace_back(x, y, t);
         }
         return data;
@@ -120,4 +142,4 @@ namespace FASTMM
   }
 
 }
-#endif /* FASTMM_GPS_HPP */
+#endif

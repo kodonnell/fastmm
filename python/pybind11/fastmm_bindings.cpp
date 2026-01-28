@@ -169,19 +169,18 @@ PYBIND11_MODULE(fastmm, m)
         .def_readonly("y", &PyMatchPoint::y, "Y coordinate of the matched point")
         .def_readonly("d", &PyMatchPoint::d,
                       "Distance from the previous matched point along the edge (coordinate units)")
-        .def_readonly("t", &PyMatchPoint::t, "Timestamp of the matched point (if inputs have time and network has speed")
-        .def_readonly("speed", &PyMatchPoint::speed,
-                      "Speed at this matched point (if network edges have speed values)")
-        .def_readonly("edge_offset", &PyMatchPoint::edge_offset,
-                      "Distance from the start of the edge to this point (coordinate units)")
-        .def_readonly("cumulative_distance", &PyMatchPoint::cumulative_distance,
-                      "Total distance from the trajectory start to this point (coordinate units)")
+        .def_property_readonly("t", [](const PyMatchPoint &p)
+                               { return p.t < 0 ? std::nullopt : std::optional<double>(p.t); }, "Timestamp of the matched point (if inputs have time and network has speed)")
+        .def_property_readonly("speed", [](const PyMatchPoint &p)
+                               { return p.speed < 0 ? std::nullopt : std::optional<double>(p.speed); }, "Speed at this matched point (if network edges have speed values)")
+        .def_readonly("edge_offset", &PyMatchPoint::edge_offset, "Distance from the start of the edge to this point (coordinate units)")
+        .def_readonly("cumulative_distance", &PyMatchPoint::cumulative_distance, "Total distance from the trajectory start to this point (coordinate units)")
         .def("__repr__", [](const PyMatchPoint &p)
              { return "<P x=" + fmt::format("{:.1f}", p.x) +
                       " y=" + fmt::format("{:.1f}", p.y) +
                       " d=" + fmt::format("{:.1f}", p.d) +
-                      fmt::format(" t={}", p.t.has_value() ? fmt::format("{:.1f}", p.t.value()) : "null") +
-                      " speed=" + (p.speed.has_value() ? fmt::format("{:.1f}", p.speed.value()) : "null") +
+                      fmt::format(" t={}", p.t >= 0 ? fmt::format("{:.1f}", p.t) : "null") +
+                      " speed=" + (p.speed >= 0 ? fmt::format("{:.1f}", p.speed) : "null") +
                       " edge_offset=" + fmt::format("{:.1f}", p.edge_offset) +
                       " cumulative_distance=" + fmt::format("{:.1f}", p.cumulative_distance) + ">"; });
 
@@ -211,16 +210,14 @@ PYBIND11_MODULE(fastmm, m)
     )pbdoc")
         .def_readonly("x", &PyMatchCandidate::x, "X coordinate of the snapped candidate location")
         .def_readonly("y", &PyMatchCandidate::y, "Y coordinate of the snapped candidate location")
-        .def_readonly("t", &PyMatchCandidate::t,
-                      "Timestamp of the original GPS observation (if trajectory has time)")
-        .def_readonly("perpendicular_distance_to_matched_geometry", &PyMatchCandidate::perpendicular_distance_to_matched_geometry,
-                      "Perpendicular distance from GPS point to the matched edge geometry")
-        .def_readonly("offset_from_start_of_edge", &PyMatchCandidate::offset_from_start_of_edge,
-                      "Distance from the start of the candidate edge to this match location")
+        .def_property_readonly("t", [](const PyMatchCandidate &c)
+                               { return c.t < 0 ? std::nullopt : std::optional<double>(c.t); }, "Timestamp of the original GPS observation (if trajectory has time)")
+        .def_readonly("perpendicular_distance_to_matched_geometry", &PyMatchCandidate::perpendicular_distance_to_matched_geometry, "Perpendicular distance from GPS point to the matched edge geometry")
+        .def_readonly("offset_from_start_of_edge", &PyMatchCandidate::offset_from_start_of_edge, "Distance from the start of the candidate edge to this match location")
         .def("__repr__", [](const PyMatchCandidate &c)
              { return "<Candidate x=" + fmt::format("{:.1f}", c.x) +
                       " y=" + fmt::format("{:.1f}", c.y) +
-                      " t=" + fmt::format("{:.1f}", c.t) +
+                      " t=" + (c.t < 0 ? "null" : fmt::format("{:.1f}", c.t)) +
                       " perpendicular_distance_to_matched_geometry=" + fmt::format("{:.1f}", c.perpendicular_distance_to_matched_geometry) +
                       " offset_from_start_of_edge=" + fmt::format("{:.1f}", c.offset_from_start_of_edge) + ">"; });
 
@@ -239,7 +236,7 @@ PYBIND11_MODULE(fastmm, m)
         .def_readonly("edges", &PyMatchSegment::edges,
                       "List of PyMatchSegmentEdge objects forming the path from p0 to p1")
         .def("__repr__", [](const PyMatchSegment &s)
-             { return "<Segment from (" + fmt::format("{:.1f}", s.p0.x) + ", " + fmt::format("{:.1f}", s.p0.y) + ", " + fmt::format("{:.1f}", s.p0.t) +
+             { return "<Segment from (" + fmt::format("{:.1f}", s.p0.x) + ", " + fmt::format("{:.1f}", s.p0.y) + ", " + (s.p0.t < 0 ? "null" : fmt::format("{:.1f}", s.p0.t)) +
                       ") to (" + fmt::format("{:.1f}", s.p1.x) + ", " + fmt::format("{:.1f}", s.p1.y) + ", " + fmt::format("{:.1f}", s.p1.t) +
                       ") with " + std::to_string(s.edges.size()) + " edges>"; });
 
@@ -325,7 +322,7 @@ PYBIND11_MODULE(fastmm, m)
                 tuples.append(py::make_tuple(std::get<0>(item), std::get<1>(item), std::get<2>(item)));
             }
             return tuples; }, R"pbdoc(
-            Export trajectory as a list of (x, y, t) tuples.
+            Export trajectory as a list of (x, y, t) tuples - only if the original had timestamps.
 
             Returns:
                 List of tuples, each containing (x_coord, y_coord, timestamp)

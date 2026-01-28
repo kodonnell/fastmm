@@ -146,13 +146,13 @@ FastMapMatch::FastMapMatch(const Network &network,
     SPDLOG_INFO("FastMapMatch initialized successfully.");
 }
 
-FastMapMatchConfig::FastMapMatchConfig(int k_arg,
+FastMapMatchConfig::FastMapMatchConfig(int max_candidates,
                                        double candidate_search_radius,
                                        double gps_error,
                                        double reverse_tolerance,
                                        TransitionMode transition_mode,
                                        std::optional<double> reference_speed)
-    : k(k_arg),
+    : max_candidates(max_candidates),
       candidate_search_radius(candidate_search_radius),
       gps_error(gps_error),
       reverse_tolerance(reverse_tolerance),
@@ -179,7 +179,7 @@ MatchResult FastMapMatch::match_trajectory(const Trajectory &trajectory, const F
 
     SPDLOG_DEBUG("Count of points in trajectory {}", trajectory.geom.get_num_points());
     SPDLOG_DEBUG("Search candidates");
-    TrajectoryCandidates tc = network_.search_tr_cs_knn(trajectory.geom, config.k, config.candidate_search_radius);
+    TrajectoryCandidates tc = network_.search_tr_cs_knn(trajectory.geom, config.max_candidates, config.candidate_search_radius);
     SPDLOG_DEBUG("Trajectory candidate {}", tc);
     MatchResult result = MatchResult{};
     result.id = trajectory.id;
@@ -277,7 +277,7 @@ double FastMapMatch::get_time(const Candidate *ca, const Candidate *cb, double r
         // Transition on the same edge
         // Speed is guaranteed to exist since NetworkGraph constructor validates this in FASTEST mode
         double segment_distance = cb->offset - ca->offset;
-        time = segment_distance / ca->edge->speed.value();
+        time = segment_distance / ca->edge->speed;
     }
     else if (ca->edge->id == cb->edge->id && ca->offset - cb->offset < reverse_tolerance)
     {
@@ -291,8 +291,8 @@ double FastMapMatch::get_time(const Candidate *ca, const Candidate *cb, double r
         double ca_remaining = ca->edge->length - ca->offset;
         double cb_initial = cb->offset;
 
-        double time_ca = ca_remaining / ca->edge->speed.value();
-        double time_cb = cb_initial / cb->edge->speed.value();
+        double time_ca = ca_remaining / ca->edge->speed;
+        double time_cb = cb_initial / cb->edge->speed;
         time = time_ca + time_cb;
     }
     else
@@ -306,8 +306,8 @@ double FastMapMatch::get_time(const Candidate *ca, const Candidate *cb, double r
         double ca_remaining = ca->edge->length - ca->offset;
         double cb_initial = cb->offset;
 
-        double time_ca = ca_remaining / ca->edge->speed.value();
-        double time_cb = cb_initial / cb->edge->speed.value();
+        double time_ca = ca_remaining / ca->edge->speed;
+        double time_cb = cb_initial / cb->edge->speed;
 
         // UBODT cost: for FASTEST mode it should be time, for SHORTEST it's distance
         // This is a known limitation - ideally UBODT should be mode-specific
@@ -425,7 +425,7 @@ PySplitMatchResult FastMapMatch::pymatch_trajectory(const CORE::Trajectory &traj
     SPDLOG_DEBUG("Split matching trajectory {} with {} points", trajectory.id, N);
 
     // Do candidate search once for all points
-    TrajectoryCandidates tc = network_.search_tr_cs_knn(trajectory.geom, config.k, config.candidate_search_radius);
+    TrajectoryCandidates tc = network_.search_tr_cs_knn(trajectory.geom, config.max_candidates, config.candidate_search_radius);
     SPDLOG_DEBUG("Trajectory candidates found for all points");
 
     // Queue of ranges to process [start_idx, end_idx]
@@ -444,11 +444,12 @@ PySplitMatchResult FastMapMatch::pymatch_trajectory(const CORE::Trajectory &traj
         // Single point - can't match, just add as failed
         if (start_idx >= end_idx)
         {
-            if (start_idx == end_idx)
+            if (start_idx > end_idx)
             {
-                SPDLOG_DEBUG("Single point at {}, skipping", start_idx);
-                // Don't add single points to output - they're just gaps
+                // This should not happen
+                throw std::runtime_error("FastMapMatch::pymatch_trajectory: Invalid range with start_idx > end_idx");
             }
+            SPDLOG_DEBUG("Single point at {}, skipping", start_idx);
             continue;
         }
 
@@ -592,6 +593,13 @@ PySplitMatchResult FastMapMatch::pymatch_trajectory(const CORE::Trajectory &traj
         SPDLOG_DEBUG("Successfully matched range [{}, {}]", start_idx, end_idx);
     }
 
+    // Sort the trajectory segments by start index - due to the FIFO there's a chance they're out of order.
+    std::sort(output.subtrajectories.begin(), output.subtrajectories.end(),
+              [](const PySubTrajectory &a, const PySubTrajectory &b)
+              {
+                  return a.start_index < b.start_index;
+              });
+
     SPDLOG_DEBUG("Split matching complete: {} sub-trajectories", output.subtrajectories.size());
     return output;
 }
@@ -624,7 +632,7 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
         int traj_idx_0 = start_idx + i - 1;
         int traj_idx_1 = start_idx + i;
 
-        const double t0 = trajectory.has_timestamps() ? trajectory.timestamps[traj_idx_0] : 0.0;
+        const double t0 = trajectory.has_timestamps() ? trajectory.timestamps[traj_idx_0] : -1.0;
         const PyMatchCandidate start_candidate = {
             boost::geometry::get<0>(mc0.c.point),
             boost::geometry::get<1>(mc0.c.point),
@@ -632,7 +640,7 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
             mc0.c.dist,
             mc0.c.offset};
 
-        const double t1 = trajectory.has_timestamps() ? trajectory.timestamps[traj_idx_1] : 0.0;
+        const double t1 = trajectory.has_timestamps() ? trajectory.timestamps[traj_idx_1] : -1.0;
         const PyMatchCandidate end_candidate = {
             boost::geometry::get<0>(mc1.c.point),
             boost::geometry::get<1>(mc1.c.point),
@@ -660,7 +668,7 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
                 {
                     cumulative_distance += d;
                 }
-                points.push_back({line.get_x(j), line.get_y(j), d, std::nullopt, e0.speed, cumulative_distance - start_distance, cumulative_distance});
+                points.push_back({line.get_x(j), line.get_y(j), d, -1.0, e0.speed, cumulative_distance - start_distance, cumulative_distance});
             }
             segment.edges.push_back({edge_id, points, is_reversed});
         }
@@ -681,7 +689,7 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
                 {
                     cumulative_distance += d;
                 }
-                points.push_back({line.get_x(j), line.get_y(j), d, std::nullopt, e.speed, cumulative_distance - start_distance, cumulative_distance});
+                points.push_back({line.get_x(j), line.get_y(j), d, -1.0, e.speed, cumulative_distance - start_distance, cumulative_distance});
             }
             segment.edges.push_back({edge_id, points, false});
 
@@ -702,7 +710,7 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
                     {
                         cumulative_distance += d;
                     }
-                    points.push_back({line.get_x(k), line.get_y(k), d, std::nullopt, e.speed, cumulative_distance - start_distance, cumulative_distance});
+                    points.push_back({line.get_x(k), line.get_y(k), d, -1.0, e.speed, cumulative_distance - start_distance, cumulative_distance});
                 }
                 segment.edges.push_back({edge_id, points, false});
             }
@@ -722,7 +730,7 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
                 {
                     cumulative_distance += d;
                 }
-                points.push_back({line.get_x(j), line.get_y(j), d, std::nullopt, e.speed, cumulative_distance - start_distance, cumulative_distance});
+                points.push_back({line.get_x(j), line.get_y(j), d, -1.0, e.speed, cumulative_distance - start_distance, cumulative_distance});
             }
             segment.edges.push_back({edge_id, points, false});
         }
@@ -738,7 +746,7 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
                 {
                     for (const auto &point : edge.points)
                     {
-                        total_expected_time += point.d / point.speed.value();
+                        total_expected_time += point.d / point.speed;
                     }
                 }
 
@@ -757,7 +765,7 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
                         }
                         else
                         {
-                            cumulative_expected_time += point.d / point.speed.value();
+                            cumulative_expected_time += point.d / point.speed;
                             point.t = t0 + cumulative_expected_time / total_expected_time * (t1 - t0);
                         }
                     }

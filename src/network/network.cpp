@@ -91,7 +91,7 @@ void Network::add_edge(EdgeID edge_id, NodeID source, NodeID target,
     t_idx = node_map[target];
   }
   EdgeIndex index = edges.size();
-  edges.push_back({index, edge_id, s_idx, t_idx, geom.get_length(), speed, geom});
+  edges.push_back({index, edge_id, s_idx, t_idx, geom.get_length(), speed.has_value() ? speed.value() : -1, geom});
   edge_map.insert({edge_id, index});
   num_vertices = node_id_vec.size();
 };
@@ -396,12 +396,7 @@ std::string Network::compute_hash() const
     sha1.process_bytes(&edge.id, sizeof(edge.id));
     sha1.process_bytes(&edge.source, sizeof(edge.source));
     sha1.process_bytes(&edge.target, sizeof(edge.target));
-    // Include speed if available (affects FASTEST mode)
-    if (edge.speed.has_value())
-    {
-      double speed_val = edge.speed.value();
-      sha1.process_bytes(&speed_val, sizeof(speed_val));
-    }
+    sha1.process_bytes(&edge.speed, sizeof(edge.speed)); // -1 if unknown
     // Add geometry:
     const LineString &geom = edge.geom;
     int num_points = geom.get_num_points();
