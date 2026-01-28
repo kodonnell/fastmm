@@ -412,15 +412,14 @@ std::string Network::compute_hash() const
     sha1.process_bytes(&edge.length, sizeof(edge.length));
   }
 
-  unsigned char digest[20];
+  unsigned int digest[5];
   sha1.get_digest(digest);
 
-  // Always take first 16 bytes → 32 hex chars
   std::ostringstream oss;
   oss << std::hex << std::setfill('0');
-  for (int i = 0; i < 16; ++i)
+  for (int i = 0; i < 4; ++i)
   {
-    oss << std::setw(2) << static_cast<unsigned>(digest[i]);
+    oss << std::setw(8) << digest[i];
   }
   return oss.str();
 }
