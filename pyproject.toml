@@ -4,6 +4,7 @@ requires = [
     "pybind11>=2.12.0",
     "setuptools-scm>=8.0",
     "pybind11-stubgen>=2.5.0",
+    "pytest>=9.0.0"
 ]
 build-backend = "scikit_build_core.build"
 
@@ -69,7 +70,7 @@ skip = "*-win32 *-musllinux_* *-manylinux_i686"
 build-verbosity = 1
 
 # Test the wheel after building
-test-command = "python -c \"import fastmm; print('fastmm version:', fastmm.__version__)\""
+test-command = "pytest {project}/test_fastmm.py -v"
 
 [tool.cibuildwheel.windows]
 # Install Boost and build dependencies before building

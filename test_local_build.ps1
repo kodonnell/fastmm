@@ -67,6 +67,9 @@ if ($LASTEXITCODE -eq 0) {
         $wheel = Get-ChildItem dist\*.whl | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         pip install --force-reinstall --no-deps $wheel.FullName
         python -c "import fastmm; print('fastmm version:', fastmm.__version__)"
+        # Run pytest after install
+        Write-Host "`nRunning pytest on installed wheel..." -ForegroundColor Green
+        pytest test_fastmm.py -v
     } else {
         Write-Host "`nSkipping installation (use -Install flag to install)" -ForegroundColor Cyan
     }

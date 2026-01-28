@@ -54,6 +54,14 @@ FastMapMatch::FastMapMatch(const Network &network,
     {
         throw std::invalid_argument("FastMapMatch: Network contains no edges");
     }
+    if (network_.get_mode() != mode)
+    {
+        throw std::invalid_argument("FastMapMatch: Network mode does not match FastMapMatch mode");
+    }
+    if (graph_.get_mode() != mode)
+    {
+        throw std::invalid_argument("FastMapMatch: NetworkGraph mode does not match FastMapMatch mode");
+    }
 
     // Create cache directory
     std::filesystem::path cache_path(cache_dir);
@@ -172,6 +180,11 @@ FastMapMatchConfig::FastMapMatchConfig(int k_arg,
 
 MatchResult FastMapMatch::match_trajectory(const Trajectory &trajectory, const FastMapMatchConfig &config)
 {
+    if (config.transition_mode != network_.get_mode() || config.transition_mode != ubodt_->get_mode() || config.transition_mode != graph_.get_mode())
+    {
+        throw std::invalid_argument("FastMapMatch::match_trajectory: Transition mode in config does not match FastMapMatch mode");
+    }
+
     SPDLOG_DEBUG("Count of points in trajectory {}", trajectory.geom.get_num_points());
     SPDLOG_DEBUG("Search candidates");
     TrajectoryCandidates tc = network_.search_tr_cs_knn(trajectory.geom, config.k, config.candidate_search_radius);

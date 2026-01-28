@@ -184,8 +184,6 @@ The `delta` parameter (called `max_distance_between_candidates` or `max_time_bet
 
 ## TODO
 
-- Add test to build pipeline.
-- check pymatch_trajectory config mode matches network mode
 - If not found in UBODT, instead of bailing, do a normal djikstra lookup.
 - Need to check reverse tolerance - on our edges, they're all directed, so we probably shouldn't allow reversing. This causes errors when we're parsing - if you reverse on the same edge, the geometry gets flipped (I think - line = ALGORITHM::cutoffseg_unique(e0.geom, start_offset, end_offset); goes backward?), which then messes with our python post-processing of associating time as the segment start/stop are now the edge stop/start, not the other way round. We could add a reversed flag to the edge? That would help. For now, just don't have a reverse tolerance.
 - Specify versions for build libs (e.g. cibuildwheel).
