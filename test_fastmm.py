@@ -68,23 +68,23 @@ class TestNetworkBasics:
         """Test that building rtree on empty network fails."""
         network = fastmm.Network()
         with pytest.raises(RuntimeError, match="empty network"):
-            network.build_rtree_index()
+            network.finalize()
 
     def test_build_rtree_success(self):
         """Test successful rtree index building."""
         network = fastmm.Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
-        network.build_rtree_index()  # Should not raise
+        network.finalize()  # Should not raise
 
 
 class TestRtreeIndexRequired:
     """Test that operations fail when rtree index is not built."""
 
     def test_matching_without_rtree_fails(self):
-        """Test that matching fails if build_rtree_index() is not called."""
+        """Test that matching fails if finalize() is not called."""
         network = fastmm.Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50.0)
-        # Don't call build_rtree_index()
+        # Don't call finalize()
 
         # This should raise because rtree index was not built
         with pytest.raises(ValueError, match="must be finalized"):
@@ -144,7 +144,7 @@ class TestNetworkGraph:
         """Test creating graph with SHORTEST mode (default)."""
         network = fastmm.Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
-        network.build_rtree_index()
+        network.finalize()
         graph = fastmm.NetworkGraph(network, fastmm.TransitionMode.SHORTEST)
         assert graph is not None
 
@@ -153,7 +153,7 @@ class TestNetworkGraph:
         network = fastmm.Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50.0)
         network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)], speed=60.0)
-        network.build_rtree_index()
+        network.finalize()
         graph = fastmm.NetworkGraph(network, fastmm.TransitionMode.FASTEST)
         assert graph is not None
 
@@ -162,7 +162,7 @@ class TestNetworkGraph:
         network = fastmm.Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50.0)
         network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])  # No speed
-        network.build_rtree_index()
+        network.finalize()
         with pytest.raises(ValueError, match="speed"):
             fastmm.NetworkGraph(network, fastmm.TransitionMode.FASTEST)
 
@@ -221,7 +221,7 @@ class TestShortestVsFastest:
         network.add_edge(5, source=5, target=3, geom=[(200, 10), (200, 0)], speed=100)
         # Edge 6: C->D
         network.add_edge(6, source=3, target=6, geom=[(200, 0), (300, 0)], speed=50)
-        network.build_rtree_index()
+        network.finalize()
         return network
 
     def test_shortest_routing_prefers_direct_route(self, network_with_detour):
@@ -302,7 +302,7 @@ class TestMatchResult:
         """Test that match result has expected structure."""
         network = fastmm.Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
-        network.build_rtree_index()
+        network.finalize()
 
         matcher = fastmm.FastMapMatch(
             network,
@@ -327,7 +327,7 @@ class TestMatchResult:
         network = fastmm.Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
         network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)], speed=50)
-        network.build_rtree_index()
+        network.finalize()
 
         matcher = fastmm.FastMapMatch(
             network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=1000, cache_dir=".cache"
@@ -356,7 +356,7 @@ class TestSplitMatching:
         network = fastmm.Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
         network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
-        network.build_rtree_index()
+        network.finalize()
 
         matcher = fastmm.FastMapMatch(
             network,
@@ -381,7 +381,7 @@ class TestSplitMatching:
         network = fastmm.Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
         network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
-        network.build_rtree_index()
+        network.finalize()
 
         matcher = fastmm.FastMapMatch(
             network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=1000, cache_dir=".cache"
@@ -420,7 +420,7 @@ class TestSplitMatching:
         """Test the structure of split match results."""
         network = fastmm.Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
-        network.build_rtree_index()
+        network.finalize()
 
         matcher = fastmm.FastMapMatch(
             network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=1000, cache_dir=".cache"
@@ -462,7 +462,7 @@ class TestSplitMatching:
         network.add_edge(6, source=6, target=7, geom=[(500, 0), (600, 0)])
         network.add_edge(7, source=7, target=8, geom=[(600, 0), (700, 0)])
         network.add_edge(8, source=8, target=9, geom=[(700, 0), (800, 0)])
-        network.build_rtree_index()
+        network.finalize()
 
         matcher = fastmm.FastMapMatch(
             network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=250, cache_dir=".cache"

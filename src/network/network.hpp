@@ -55,7 +55,7 @@ namespace FASTMM
        *  Default constructor of Network (creates empty network)
        *
        *  Creates an empty network that can be populated using add_edge.
-       *  After adding all edges, call build_rtree_index() to build the spatial index.
+       *  After adding all edges, call finalize() to build the spatial index.
        */
       Network();
       /**
@@ -192,7 +192,7 @@ namespace FASTMM
        * This must be called after all edges have been added to the network
        * and before performing any spatial queries.
        */
-      void build_rtree_index();
+      void finalize();
 
       /**
        * Compute a hash of the network structure for cache validation
@@ -213,10 +213,9 @@ namespace FASTMM
       static void append_segs_to_line(FASTMM::CORE::LineString *line,
                                       const FASTMM::CORE::LineString &segs,
                                       int offset = 0);
-      Rtree rtree;              // Network rtree structure
-      bool rtree_built = false; // Flag to track if rtree has been built
-      bool finalized = false;   // Flag to prevent modifications after finalization
-      std::vector<Edge> edges;  // all edges in the network
+      Rtree rtree;             // Network rtree structure
+      bool finalized = false;  // Flag to prevent modifications after finalization
+      std::vector<Edge> edges; // all edges in the network
       NodeIDVec node_id_vec;
       unsigned int num_vertices;
       NodeIndexMap node_map;

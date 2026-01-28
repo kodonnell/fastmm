@@ -48,7 +48,7 @@ FastMapMatch::FastMapMatch(const Network &network,
     }
     if (!network_.is_finalized())
     {
-        throw std::invalid_argument("FastMapMatch: Network must be finalized (call build_rtree_index() first)");
+        throw std::invalid_argument("FastMapMatch: Network must be finalized (call finalize() first)");
     }
     if (network_.get_edge_count() == 0)
     {

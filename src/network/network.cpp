@@ -50,7 +50,7 @@ void Network::add_edge(EdgeID edge_id, NodeID source, NodeID target,
   // Check if network is finalized
   if (finalized)
   {
-    throw std::runtime_error("Cannot add edge to finalized network. Network is frozen after build_rtree_index().");
+    throw std::runtime_error("Cannot add edge to finalized network. Network is frozen after finalize().");
   }
 
   // Validate speed if provided
@@ -148,7 +148,7 @@ bool Network::is_finalized() const
 }
 
 // Construct a Rtree using the vector of edges
-void Network::build_rtree_index()
+void Network::finalize()
 {
   if (edges.empty())
   {
@@ -167,7 +167,6 @@ void Network::build_rtree_index()
     boost_box b(Point(x1, y1), Point(x2, y2));
     rtree.insert(std::make_pair(b, edge));
   }
-  rtree_built = true;
   finalized = true; // Finalize the network - no more edges can be added
   SPDLOG_DEBUG("Create boost rtree done");
   SPDLOG_INFO("Network finalized with {} vertices and {} edges", num_vertices, edges.size());
@@ -180,9 +179,9 @@ TrajectoryCandidates Network::search_tr_cs_knn(Trajectory &trajectory, std::size
 
 TrajectoryCandidates Network::search_tr_cs_knn(const LineString &geom, std::size_t k, double radius) const
 {
-  if (!rtree_built)
+  if (!finalized)
   {
-    throw std::runtime_error("Spatial index not built. Call build_rtree_index() after adding all edges to the network.");
+    throw std::runtime_error("Spatial index not built. Call finalize() after adding all edges to the network.");
   }
 
   int NumberPoints = geom.get_num_points();

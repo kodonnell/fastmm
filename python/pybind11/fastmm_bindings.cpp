@@ -48,13 +48,13 @@ PYBIND11_MODULE(fastmm, m)
         Example:
             >>> network = fastmm.Network()
             >>> network.add_edge(1, source=10, target=20, geom=[(0, 0), (100, 0)], speed=50.0)
-            >>> network.build_rtree_index()
+            >>> network.finalize()
     )pbdoc")
         .def(py::init<>(), R"pbdoc(
             Create an empty network.
 
             Use add_edge() to populate the network with road segments, then call
-            build_rtree_index() to prepare it for map matching.
+            finalize() to prepare it for map matching.
         )pbdoc")
         .def("add_edge", [](Network &self, int edge_id, int source, int target, py::list coords, std::optional<double> speed)
              {
@@ -88,12 +88,12 @@ PYBIND11_MODULE(fastmm, m)
                        Required if using TransitionMode.FASTEST routing.
 
             Note:
-                Call build_rtree_index() after adding all edges.
+                Call finalize() after adding all edges.
 
             Example:
                 >>> network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50.0)
         )pbdoc")
-        .def("build_rtree_index", &Network::build_rtree_index,
+        .def("finalize", &Network::finalize,
              R"pbdoc(
             Build the spatial R-tree index for efficient candidate edge lookup.
 
@@ -146,7 +146,7 @@ PYBIND11_MODULE(fastmm, m)
             Create a NetworkGraph from a Network with specified routing mode.
 
             Args:
-                network: Network with edges (must have build_rtree_index() called)
+                network: Network with edges (must have finalize() called)
                 mode: Routing mode - SHORTEST (distance-based) or FASTEST (time-based).
                       Default is SHORTEST.
 
@@ -336,7 +336,7 @@ PYBIND11_MODULE(fastmm, m)
             Create a FastMapMatch instance with automatic UBODT management.
 
             Args:
-                network: Road network with spatial index built (call build_rtree_index() first)
+                network: Road network with spatial index built (call finalize() first)
                 mode: Routing mode (TransitionMode.SHORTEST for distance, FASTEST for time)
                 max_distance_between_candidates: Maximum distance in meters (for SHORTEST mode)
                 max_time_between_candidates: Maximum time in seconds (for FASTEST mode)

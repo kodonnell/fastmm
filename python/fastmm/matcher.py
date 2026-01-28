@@ -20,7 +20,7 @@ class MapMatcher:
         # SHORTEST mode (distance-based)
         network = fastmm.Network()
         # ... add edges ...
-        network.build_rtree_index()
+        network.finalize()
 
         matcher = MapMatcher(
             network=network,

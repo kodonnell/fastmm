@@ -38,7 +38,7 @@ import fastmm
 network = fastmm.Network()
 network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
 network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
-network.build_rtree_index()
+network.finalize()
 
 # Create matcher with automatic UBODT caching (SHORTEST mode - distance-based)
 matcher = fastmm.MapMatcher(
@@ -69,7 +69,7 @@ For time-based routing (requires speed on all edges):
 network = fastmm.Network()
 network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=13.9)  # 50 km/h
 network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)], speed=13.9)
-network.build_rtree_index()
+network.finalize()
 
 # Create matcher with FASTEST mode
 matcher = fastmm.MapMatcher(
@@ -100,7 +100,7 @@ import fastmm
 network = fastmm.Network()
 network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
 network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
-network.build_rtree_index()
+network.finalize()
 
 # Build routing graph and UBODT manually
 mode = fastmm.TransitionMode.SHORTEST
@@ -186,7 +186,6 @@ The `delta` parameter (called `max_distance_between_candidates` or `max_time_bet
 
 - Add test to build pipeline.
 - check pymatch_trajectory config mode matches network mode
-- use 'prepare for matching' or similar. not build_rtree_index.
 - If not found in UBODT, instead of bailing, do a normal djikstra lookup.
 - Need to check reverse tolerance - on our edges, they're all directed, so we probably shouldn't allow reversing. This causes errors when we're parsing - if you reverse on the same edge, the geometry gets flipped (I think - line = ALGORITHM::cutoffseg_unique(e0.geom, start_offset, end_offset); goes backward?), which then messes with our python post-processing of associating time as the segment start/stop are now the edge stop/start, not the other way round. We could add a reversed flag to the edge? That would help. For now, just don't have a reverse tolerance.
 - Specify versions for build libs (e.g. cibuildwheel).
@@ -205,7 +204,7 @@ import fastmm
 # Create network with SHORTEST mode (default)
 network = fastmm.Network()
 network.add_edge(edge_id=1, source=1, target=2, geom=linestring)
-network.build_rtree_index()
+network.finalize()
 
 # Create graph for distance-based routing
 graph = fastmm.NetworkGraph(network, mode=fastmm.TransitionMode.SHORTEST)
@@ -239,7 +238,7 @@ import fastmm
 network = fastmm.Network()
 network.add_edge(edge_id=1, source=1, target=2, geom=linestring, speed=50.0)  # speed in units/time
 network.add_edge(edge_id=2, source=2, target=3, geom=linestring2, speed=30.0)
-network.build_rtree_index()
+network.finalize()
 
 # Create graph for time-based routing
 graph = fastmm.NetworkGraph(network, mode=fastmm.TransitionMode.FASTEST)
