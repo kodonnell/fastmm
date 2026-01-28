@@ -85,6 +85,7 @@ matcher = fastmm.MapMatcher(
 
 ## TODO
 
+- unused
 - If not found in UBODT, instead of bailing, do a normal djikstra lookup.
 - max_distance_between_candidates is not a hard limit in UBODT ... I think. Test this, and if needed, add an extra check.
 - Specify versions for build libs (e.g. cibuildwheel).

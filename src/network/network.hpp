@@ -221,6 +221,7 @@ namespace FASTMM
       NodeIndexMap node_map;
       EdgeIndexMap edge_map;
       std::vector<FASTMM::CORE::Point> vertex_points;
+      bool all_edges_have_speed = true; // True if all edges have speed, false if any edge lacks speed
     };
   }
 }

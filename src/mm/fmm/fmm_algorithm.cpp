@@ -241,153 +241,6 @@ MatchResult FastMapMatch::match_trajectory(const Trajectory &trajectory, const F
     return result;
 }
 
-PyMatchResult FastMapMatch::pymatch_trajectory(const CORE::Trajectory &trajectory,
-                                               const FastMapMatchConfig &config)
-{
-    MatchResult result = match_trajectory(trajectory, config);
-    PyMatchResult output;
-    output.id = result.id;
-    output.error_code = result.error_code;
-    output.last_connected_trajectory_point = result.last_connected_trajectory_point;
-    output.unmatched_candidate_indices = result.unmatched_candidate_indices;
-    output.segments = std::vector<PyMatchSegment>{};
-    FASTMM::MM::CompletePath edge_ids = result.complete_path;
-
-    if (result.error_code != MatchErrorCode::SUCCESS)
-    {
-        return output;
-    }
-
-    // For each of the candidate points, get the segment from p0 to p1, and the edges in between:
-    double cumulative_distance = 0;
-    for (int i = 1; i < result.opt_candidate_path.size(); ++i)
-    {
-        const MatchedCandidate &mc0 = result.opt_candidate_path[i - 1];
-        const MatchedCandidate &mc1 = result.opt_candidate_path[i];
-        // Get the first edge, and add the segment from the match point to the end of the edge:
-        const int start_edge_index = result.indices[i - 1];
-        const int end_edge_index = result.indices[i];
-        if (start_edge_index < 0 || start_edge_index >= edge_ids.size())
-        {
-            SPDLOG_WARN("Start edge index {} out of bounds [0, {})", start_edge_index, edge_ids.size());
-            output.error_code = MatchErrorCode::INDEX_OUT_OF_BOUNDS;
-            return output;
-        }
-        if (end_edge_index < 0 || end_edge_index >= edge_ids.size())
-        {
-            SPDLOG_WARN("End edge index {} out of bounds [0, {})", end_edge_index, edge_ids.size());
-            output.error_code = MatchErrorCode::INDEX_OUT_OF_BOUNDS_END;
-            return output;
-        }
-
-        const PyMatchCandidate start_candidate = {
-            boost::geometry::get<0>(mc0.c.point),
-            boost::geometry::get<1>(mc0.c.point),
-            trajectory.timestamps.empty() ? 0.0 : trajectory.timestamps[i - 1],
-            mc0.c.dist,
-            mc0.c.offset};
-        const PyMatchCandidate end_candidate = {
-            boost::geometry::get<0>(mc1.c.point),
-            boost::geometry::get<1>(mc1.c.point),
-            trajectory.timestamps.empty() ? 0.0 : trajectory.timestamps[i],
-            mc1.c.dist,
-            mc1.c.offset};
-        double start_offset, end_offset, start_distance;
-        FASTMM::CORE::LineString line;
-        std::vector<PyMatchPoint> points;
-        PyMatchSegment segment = {start_candidate, end_candidate, {}};
-        std::vector<double> distances;
-        EdgeID edge_id;
-        if (start_edge_index == end_edge_index)
-        {
-            // OK, this segment is just one edge:
-            edge_id = result.complete_path[start_edge_index];
-            const Edge &e0 = network_.get_edge(edge_id);
-            start_offset = mc0.c.offset;
-            end_offset = mc1.c.offset;
-            bool is_reversed = (start_offset > end_offset);
-            line = ALGORITHM::cutoffseg_unique(e0.geom, start_offset, end_offset);
-            points.clear();
-            distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
-            start_distance = cumulative_distance;
-            for (int j = 0; j < line.get_num_points(); ++j)
-            {
-                if (j > 0)
-                {
-                    cumulative_distance += distances[j - 1];
-                }
-                points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
-            }
-            const PyMatchSegmentEdge segmentEdge = {edge_id, points, is_reversed};
-            segment.edges.push_back(segmentEdge);
-        }
-        else
-        {
-            // OK, multiple segments.
-
-            // First, the segment from the start point to the end of the first edge:
-            edge_id = result.complete_path[start_edge_index];
-            const Edge &e0 = network_.get_edge(edge_id);
-            start_offset = mc0.c.offset;
-            line = ALGORITHM::cutoffseg_unique(e0.geom, start_offset, e0.length);
-            points.clear();
-            distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
-            start_distance = cumulative_distance;
-            for (int j = 0; j < line.get_num_points(); ++j)
-            {
-                if (j > 0)
-                {
-                    cumulative_distance += distances[j - 1];
-                }
-                points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
-            }
-            segment.edges.push_back({edge_id, points, false});
-
-            // Next, all the full edges in between:
-            for (int j = start_edge_index + 1; j < end_edge_index; ++j)
-            {
-                edge_id = result.complete_path[j];
-                line = network_.get_edge(edge_id).geom;
-                distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
-                points.clear();
-                start_distance = cumulative_distance;
-                for (int k = 0; k < line.get_num_points(); ++k)
-                {
-                    if (k > 0)
-                    {
-                        cumulative_distance += distances[k - 1];
-                    }
-                    points.push_back({line.get_x(k), line.get_y(k), cumulative_distance - start_distance, cumulative_distance});
-                }
-                segment.edges.push_back({edge_id, points, false});
-            }
-            // Finally, the segment from the start of the last edge to the end point:
-            edge_id = result.complete_path[end_edge_index];
-            const Edge &e1 = network_.get_edge(edge_id);
-            start_offset = 0;
-            end_offset = mc1.c.offset;
-            line = ALGORITHM::cutoffseg_unique(e1.geom, start_offset, end_offset);
-            distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
-            start_distance = cumulative_distance;
-            points.clear();
-            for (int j = 0; j < line.get_num_points(); ++j)
-            {
-                if (j > 0)
-                {
-                    cumulative_distance += distances[j - 1];
-                }
-                points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
-            }
-            segment.edges.push_back({edge_id, points, false});
-        }
-
-        // Done!
-        output.segments.push_back(segment);
-    }
-    output.error_code = MatchErrorCode::SUCCESS;
-    return output;
-}
-
 double FastMapMatch::get_distance(const Candidate *ca, const Candidate *cb, double reverse_tolerance)
 {
     double distance = 0;
@@ -543,8 +396,12 @@ void FastMapMatch::update_layer(int level, TGLayer *la_ptr, TGLayer *lb_ptr, dou
     }
 }
 
-PySplitMatchResult FastMapMatch::pymatch_trajectory_split(const CORE::Trajectory &trajectory,
-                                                          const FastMapMatchConfig &config)
+PySplitMatchResult FastMapMatch::pymatch_trajectory(const CORE::Trajectory &trajectory,
+                                                    int max_candidates,
+                                                    double candidate_search_radius,
+                                                    double gps_error,
+                                                    double reverse_tolerance,
+                                                    std::optional<double> reference_speed)
 {
     // Algorithm: Automatic trajectory splitting with candidate reuse
     // 1. Do candidate search once for all points (performance optimization)
@@ -556,6 +413,13 @@ PySplitMatchResult FastMapMatch::pymatch_trajectory_split(const CORE::Trajectory
     // 4. Only successful matches are returned in subtrajectories
     //    Failed points/ranges are simply excluded (not returned as failed sub-trajectories)
 
+    FastMapMatchConfig config(
+        max_candidates,
+        candidate_search_radius,
+        gps_error,
+        reverse_tolerance,
+        mode_,
+        reference_speed);
     PySplitMatchResult output;
     output.id = trajectory.id;
     int N = trajectory.geom.get_num_points();

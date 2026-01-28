@@ -120,6 +120,8 @@
         "setuptools",
         "skbuild",
         "softprops",
+        "subtrajectories",
+        "traj",
         "ubodt",
         "vcpkg",
         "venv"

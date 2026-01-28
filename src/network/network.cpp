@@ -54,9 +54,16 @@ void Network::add_edge(EdgeID edge_id, NodeID source, NodeID target,
   }
 
   // Validate speed if provided
-  if (speed.has_value() && speed.value() <= 0)
+  if (speed.has_value())
   {
-    throw std::invalid_argument("Speed must be positive");
+    if (speed.value() <= 0)
+    {
+      throw std::invalid_argument("Speed must be positive");
+    }
+  }
+  else
+  {
+    all_edges_have_speed = false;
   }
 
   NodeIndex s_idx, t_idx;

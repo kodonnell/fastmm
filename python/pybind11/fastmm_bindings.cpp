@@ -158,69 +158,8 @@ PYBIND11_MODULE(fastmm, m)
                 paths differ between distance-based and time-based routing.
         )pbdoc");
 
-    // FastMapMatchConfig class
-    py::class_<FastMapMatchConfig>(m, "FastMapMatchConfig", R"pbdoc(
-        Configuration parameters for the Fast Map Matching algorithm.
-
-        Controls candidate generation, emission/transition probability calculations,
-        and routing behavior. Proper tuning of these parameters significantly affects
-        matching quality and performance.
-    )pbdoc")
-        .def(py::init<int, double, double, double, TransitionMode, std::optional<double>>(),
-             py::arg("k") = 8,
-             py::arg("candidate_search_radius") = 50,
-             py::arg("gps_error") = 50,
-             py::arg("reverse_tolerance") = 0.0,
-             py::arg("transition_mode") = TransitionMode::SHORTEST,
-             py::arg("reference_speed") = std::nullopt,
-             R"pbdoc(
-            Create map matching configuration.
-
-            Args:
-                k: Maximum number of candidate edges to consider per GPS point.
-                   Higher values improve matching quality in dense networks but slow
-                   performance. Typical: 4-16. Default: 8.
-
-                candidate_search_radius: Maximum distance to search for candidate edges
-                   around each GPS point (in coordinate units). Should exceed typical GPS
-                   errors. Typical: 30-100 meters. Default: 50.
-
-                gps_error: Expected GPS accuracy (standard deviation in coordinate units).
-                   Used in emission probability: P(obs|candidate) ~ exp(-dist²/(2*gps_error²)).
-                   Higher values are more tolerant of GPS noise. Typical: 10-100 meters.
-                   Default: 50.
-
-                reverse_tolerance: Maximum distance allowed when routing backward along
-                   an edge (in coordinate units). Set to 0 to forbid reversing, which is
-                   recommended for directed road networks. Default: 0.0.
-
-                transition_mode: Routing cost metric - SHORTEST (distance) or FASTEST (time).
-                   Must match the mode used to create NetworkGraph and UBODT. Default: SHORTEST.
-
-                reference_speed: Expected travel speed for straight-line movement between GPS
-                   points (distance units per time unit). REQUIRED for FASTEST mode, unused
-                   for SHORTEST mode. This represents the typical speed at which vehicles
-                   travel directly between points. Lower values encourage sticking to routes,
-                   higher values allow more detours. Typical: average vehicle speed like 40-60
-                   in urban areas. Default: None.
-
-            Raises:
-                ValueError: If transition_mode is FASTEST but reference_speed is None
-        )pbdoc")
-        .def_readwrite("k", &FastMapMatchConfig::k, "Maximum number of candidate edges per GPS point")
-        .def_readwrite("candidate_search_radius", &FastMapMatchConfig::candidate_search_radius,
-                       "Search radius for finding candidate edges (coordinate units)")
-        .def_readwrite("gps_error", &FastMapMatchConfig::gps_error,
-                       "Expected GPS accuracy for emission probability (coordinate units)")
-        .def_readwrite("reverse_tolerance", &FastMapMatchConfig::reverse_tolerance,
-                       "Maximum distance allowed for reverse routing on edges (coordinate units)")
-        .def_readwrite("transition_mode", &FastMapMatchConfig::transition_mode,
-                       "Routing mode: SHORTEST (distance-based) or FASTEST (time-based)")
-        .def_readwrite("reference_speed", &FastMapMatchConfig::reference_speed,
-                       "Expected straight-line travel speed (required for FASTEST mode)");
-
-    // PyMatchPoint struct
-    py::class_<PyMatchPoint>(m, "PyMatchPoint", R"pbdoc(
+    // MatchPoint struct
+    py::class_<PyMatchPoint>(m, "MatchPoint", R"pbdoc(
         A matched point along a road edge in the map matching result.
 
         Represents a specific location on a matched edge, including its position
@@ -239,7 +178,7 @@ PYBIND11_MODULE(fastmm, m)
                       " cumulative_distance=" + fmt::format("{:.1f}", p.cumulative_distance) + ">"; });
 
     // PyMatchSegmentEdge struct
-    py::class_<PyMatchSegmentEdge>(m, "PyMatchSegmentEdge", R"pbdoc(
+    py::class_<PyMatchSegmentEdge>(m, "MatchSegmentEdge", R"pbdoc(
         A matched road edge with interpolated points along the matched path.
 
         Contains the edge ID and a sequence of matched points representing where
@@ -255,7 +194,7 @@ PYBIND11_MODULE(fastmm, m)
              { return "<Edge edge_id=" + std::to_string(e.edge_id) + " with " + std::to_string(e.points.size()) + " points" + (e.reversed ? " (reversed)" : "") + ">"; });
 
     // PyMatchCandidate struct
-    py::class_<PyMatchCandidate>(m, "PyMatchCandidate", R"pbdoc(
+    py::class_<PyMatchCandidate>(m, "MatchCandidate", R"pbdoc(
         A candidate match location for a GPS observation point.
 
         Represents a potential location on the road network where a GPS point might
@@ -278,7 +217,7 @@ PYBIND11_MODULE(fastmm, m)
                       " offset_from_start_of_edge=" + fmt::format("{:.1f}", c.offset_from_start_of_edge) + ">"; });
 
     // PyMatchSegment struct
-    py::class_<PyMatchSegment>(m, "PyMatchSegment", R"pbdoc(
+    py::class_<PyMatchSegment>(m, "MatchSegment", R"pbdoc(
         A continuous matched path segment between two GPS observation points.
 
         Represents the matched route from one GPS point to the next, potentially
@@ -297,7 +236,7 @@ PYBIND11_MODULE(fastmm, m)
                       ") with " + std::to_string(s.edges.size()) + " edges>"; });
 
     // PyMatchResult struct
-    py::class_<PyMatchResult>(m, "PyMatchResult", R"pbdoc(
+    py::class_<PyMatchResult>(m, "MatchResult", R"pbdoc(
         Complete map matching result for a trajectory.
 
         Contains the matched path as a sequence of segments, error information,
@@ -312,7 +251,7 @@ PYBIND11_MODULE(fastmm, m)
         .def_readonly("unmatched_candidate_indices", &PyMatchResult::unmatched_candidate_indices,
                       "List of trajectory point indices that could not be matched (e.g., too far from network)")
         .def_readonly("segments", &PyMatchResult::segments,
-                      "List of PyMatchSegment objects forming the complete matched path")
+                      "List of MatchSegment objects forming the complete matched path")
         .def("__repr__", [](const PyMatchResult &r)
              { return "<Match id=" + std::to_string(r.id) +
                       " error_code=" + std::to_string(static_cast<int>(r.error_code)) +
@@ -320,92 +259,13 @@ PYBIND11_MODULE(fastmm, m)
                       " number unmatched candidates=" + std::to_string(r.unmatched_candidate_indices.size()) +
                       " with " + std::to_string(r.segments.size()) + " segments>"; });
 
-    // FastMapMatch class
-    py::class_<FastMapMatch>(m, "FastMapMatch", R"pbdoc(
-        Fast map matching algorithm using Hidden Markov Model with UBODT optimization.
-
-        Matches GPS trajectories to a road network by finding the most probable sequence
-        of road edges, considering both emission probabilities (GPS accuracy) and transition
-        probabilities (path likelihood). Uses precomputed UBODT for fast path lookups.
-    )pbdoc")
-        .def(py::init<const Network &, TransitionMode, std::optional<double>, std::optional<double>, const std::string &>(),
-             py::arg("network"),
-             py::arg("mode"),
-             py::arg("max_distance_between_candidates") = std::nullopt,
-             py::arg("max_time_between_candidates") = std::nullopt,
-             py::arg("cache_dir") = "./ubodt_cache",
-             R"pbdoc(
-            Create a FastMapMatch instance with automatic UBODT management.
-
-            Args:
-                network: Road network with spatial index built (call finalize() first)
-                mode: Routing mode (TransitionMode.SHORTEST for distance, FASTEST for time)
-                max_distance_between_candidates: Maximum distance in meters (for SHORTEST mode)
-                max_time_between_candidates: Maximum time in seconds (for FASTEST mode)
-                cache_dir: Directory for caching UBODT files (default: "./ubodt_cache")
-
-            Note:
-                Only the relevant parameter is used depending on mode. This constructor automatically generates/loads UBODT from cache based
-                on network hash, mode, and delta. UBODT is cached for reuse.
-        )pbdoc")
-        .def("pymatch_trajectory", &FastMapMatch::pymatch_trajectory,
-             py::arg("trajectory"), py::arg("config"),
-             R"pbdoc(
-            Match a GPS trajectory to the road network.
-
-            Applies the Hidden Markov Model map matching algorithm to find the most
-            likely sequence of road edges corresponding to the input GPS points.
-
-            Args:
-                trajectory: Trajectory with GPS observations (with or without timestamps)
-                config: FastMapMatchConfig with matching parameters
-
-            Returns:
-                PyMatchResult containing the matched path segments, or error information
-                if matching failed
-
-            Note:
-                The config's transition_mode must match the mode used to create the
-                NetworkGraph and UBODT. For FASTEST mode, ensure reference_speed is set.
-        )pbdoc")
-        .def("pymatch_trajectory_split", &FastMapMatch::pymatch_trajectory_split,
-             py::arg("trajectory"), py::arg("config"),
-             R"pbdoc(
-            Match a GPS trajectory with automatic splitting on failures.
-
-            This method performs candidate search once and reuses it when matching
-            sub-trajectories, providing better performance than repeatedly calling
-            pymatch_trajectory() on split segments. When the matching algorithm
-            encounters failures (no candidates, disconnected layers), it automatically
-            continues matching from the next viable point instead of stopping.
-
-            Args:
-                trajectory: Trajectory with GPS observations (with or without timestamps)
-                config: FastMapMatchConfig with matching parameters
-
-            Returns:
-                PySplitMatchResult containing a list of sub-trajectories, each marked
-                as either successfully matched (with segments) or failed (with error code)
-
-            Example:
-                Trajectory with points [0,1,2,3,4,5,6,7] where point 4 has no candidates:
-                - Returns 2 sub-trajectories: [0-3] SUCCESS, [4-4] CANDIDATES_NOT_FOUND
-                - If points 5-7 can be matched, adds [5-7] SUCCESS
-                - Much faster than calling pymatch_trajectory() multiple times since
-                  candidate lookup is done once
-
-            Note:
-                The config's transition_mode must match the mode used to create the
-                NetworkGraph and UBODT. For FASTEST mode, ensure reference_speed is set.
-        )pbdoc");
-
-    // PySubTrajectory struct
-    py::class_<PySubTrajectory>(m, "PySubTrajectory", R"pbdoc(
+    // SubTrajectory struct
+    py::class_<PySubTrajectory>(m, "SubTrajectory", R"pbdoc(
         A continuous portion of a trajectory that was matched or failed.
 
         Represents a successful match with segments. Failed portions are simply
         excluded from the results - only successfully matched sub-trajectories
-        are returned in the PySplitMatchResult.
+        are returned in the SplitMatchResult.
     )pbdoc")
         .def_readonly("start_index", &PySubTrajectory::start_index,
                       "Starting trajectory point index (inclusive)")
@@ -414,7 +274,7 @@ PYBIND11_MODULE(fastmm, m)
         .def_readonly("error_code", &PySubTrajectory::error_code,
                       "MatchErrorCode: SUCCESS if matched, or failure reason (informational)")
         .def_readonly("segments", &PySubTrajectory::segments,
-                      "List of PyMatchSegment objects (only populated if error_code == SUCCESS)")
+                      "List of MatchSegment objects (only populated if error_code == SUCCESS)")
         .def("__repr__", [](const PySubTrajectory &s)
              {
                  std::string status = (s.error_code == MatchErrorCode::SUCCESS) ? "SUCCESS" : "FAILED";
@@ -422,8 +282,8 @@ PYBIND11_MODULE(fastmm, m)
                         std::to_string(s.end_index) + "] " + status +
                         " with " + std::to_string(s.segments.size()) + " segments>"; });
 
-    // PySplitMatchResult struct
-    py::class_<PySplitMatchResult>(m, "PySplitMatchResult", R"pbdoc(
+    // SplitMatchResult struct
+    py::class_<PySplitMatchResult>(m, "SplitMatchResult", R"pbdoc(
         Result of matching with automatic trajectory splitting.
 
         Contains a list of sub-trajectories representing all continuous matched
@@ -433,7 +293,7 @@ PYBIND11_MODULE(fastmm, m)
         .def_readonly("id", &PySplitMatchResult::id,
                       "Trajectory ID (copied from input Trajectory)")
         .def_readonly("subtrajectories", &PySplitMatchResult::subtrajectories,
-                      "List of PySubTrajectory objects (both successful and failed portions)")
+                      "List of SubTrajectory objects (both successful and failed portions)")
         .def("__repr__", [](const PySplitMatchResult &r)
              {
                  int success_count = 0;
@@ -534,5 +394,95 @@ PYBIND11_MODULE(fastmm, m)
 
             Returns:
                 Trajectory instance without time information
+        )pbdoc");
+
+    // FastMapMatch class
+    py::class_<FastMapMatch>(m, "FastMapMatch", R"pbdoc(
+        Fast map matching algorithm using Hidden Markov Model with UBODT optimization.
+
+        Matches GPS trajectories to a road network by finding the most probable sequence
+        of road edges, considering both emission probabilities (GPS accuracy) and transition
+        probabilities (path likelihood). Uses precomputed UBODT for fast path lookups.
+    )pbdoc")
+        .def(py::init<const Network &, TransitionMode, std::optional<double>, std::optional<double>, const std::string &>(),
+             py::arg("network"),
+             py::arg("mode"),
+             py::arg("max_distance_between_candidates") = std::nullopt,
+             py::arg("max_time_between_candidates") = std::nullopt,
+             py::arg("cache_dir") = "./ubodt_cache",
+             R"pbdoc(
+            Create a FastMapMatch instance with automatic UBODT management.
+
+            Args:
+                network: Road network with spatial index built (call finalize() first)
+                mode: Routing mode (TransitionMode.SHORTEST for distance, FASTEST for time)
+                max_distance_between_candidates: Maximum distance in meters (for SHORTEST mode)
+                max_time_between_candidates: Maximum time in seconds (for FASTEST mode)
+                cache_dir: Directory for caching UBODT files (default: "./ubodt_cache")
+
+            Note:
+                Only the relevant parameter is used depending on mode. This constructor automatically generates/loads UBODT from cache based
+                on network hash, mode, and delta. UBODT is cached for reuse.
+        )pbdoc")
+        .def("match", &FastMapMatch::pymatch_trajectory,
+             py::arg("trajectory"),
+             py::arg("max_candidates") = 8,
+             py::arg("candidate_search_radius"),
+             py::arg("gps_error"),
+             py::arg("reverse_tolerance") = 0.0,
+             py::arg("reference_speed") = std::nullopt,
+             py::return_value_policy::move,
+             R"pbdoc(
+            Match a GPS trajectory with automatic splitting on failures.
+
+            This method performs candidate search once and reuses it when matching
+            sub-trajectories. When the matching algorithm
+            encounters failures (no candidates, disconnected layers), it automatically
+            continues matching from the next viable point instead of stopping.
+
+            Args:
+                trajectory: Trajectory with GPS observations (with or without timestamps)
+
+                max_candidates: Maximum number of candidate edges to consider per GPS point.
+                   Higher values improve matching quality in dense networks but slow
+                   performance. Typical: 4-16. Default: 8.
+
+                candidate_search_radius: Maximum distance to search for candidate edges
+                   around each GPS point (in coordinate units). Should exceed typical GPS
+                   errors. Typical: 30-100 meters. Default: 50.
+
+                gps_error: Expected GPS accuracy (standard deviation in coordinate units).
+                   Used in emission probability: P(obs|candidate) ~ exp(-dist²/(2*gps_error²)).
+                   Higher values are more tolerant of GPS noise. Typical: 10-100 meters.
+                   Default: 50.
+
+                reverse_tolerance: Maximum distance allowed when routing backward along
+                   an edge (in coordinate units). Set to 0 to forbid reversing, which is
+                   recommended for directed road networks. Default: 0.0.
+
+                transition_mode: Routing cost metric - SHORTEST (distance) or FASTEST (time).
+                   Must match the mode used to create NetworkGraph and UBODT. Default: SHORTEST.
+
+                reference_speed: Expected travel speed for straight-line movement between GPS
+                   points (distance units per time unit). REQUIRED for FASTEST mode, unused
+                   for SHORTEST mode. This represents the typical speed at which vehicles
+                   travel directly between points. Lower values encourage sticking to routes,
+                   higher values allow more detours. Typical: average vehicle speed like 40-60
+                   in urban areas. Default: None.
+
+            Returns:
+                SplitMatchResult: containing a list of sub-trajectories, each marked
+                as either successfully matched (with segments) or failed (with error code)
+
+            Example:
+                Trajectory with points [0,1,2,3,4,5,6,7] where point 4 has no candidates:
+                - Returns 2 sub-trajectories: [0-3] SUCCESS, [4-4] CANDIDATES_NOT_FOUND
+                - If points 5-7 can be matched, adds [5-7] SUCCESS
+                - Much faster than calling match_trajectory() multiple times since
+                  candidate lookup is done once
+
+            Note:
+                The config's transition_mode must match the mode used to create the
+                NetworkGraph and UBODT. For FASTEST mode, ensure reference_speed is set.
         )pbdoc");
 }

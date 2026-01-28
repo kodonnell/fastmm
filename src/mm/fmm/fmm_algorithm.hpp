@@ -75,6 +75,26 @@ namespace FASTMM
                    std::optional<double> max_distance_between_candidates = std::nullopt,
                    std::optional<double> max_time_between_candidates = std::nullopt,
                    const std::string &cache_dir = "./ubodt_cache");
+
+      /**
+       * Match a trajectory with automatic splitting on failures
+       * Performs candidate search once and reuses it for all sub-trajectories
+       * @param  trajectory   input trajectory data
+       * @param  max_candidates the number of candidates
+       * @param  candidate_search_radius the search radius, in map unit
+       * @param  gps_error the gps error, in map unit
+       * @param  reverse_tolerance reverse tolerance, in map unit
+       * @param  reference_speed reference speed for FASTEST mode (optional)
+       * @return split match result containing all successful and failed sub-trajectories
+       */
+      PySplitMatchResult pymatch_trajectory(const CORE::Trajectory &trajectory,
+                                            int max_candidates,
+                                            double candidate_search_radius,
+                                            double gps_error,
+                                            double reverse_tolerance,
+                                            std::optional<double> reference_speed);
+
+    protected:
       /**
        * Match a trajectory to the road network
        * @param  trajectory   input trajector data
@@ -83,25 +103,7 @@ namespace FASTMM
        */
       MatchResult match_trajectory(const CORE::Trajectory &trajectory,
                                    const FastMapMatchConfig &config);
-      /**
-       * Match a trajectory to the road network
-       * @param  trajectory   input trajector data
-       * @param  config configuration of map matching algorithm
-       * @return map matching result
-       */
-      PyMatchResult pymatch_trajectory(const CORE::Trajectory &trajectory,
-                                       const FastMapMatchConfig &config);
-      /**
-       * Match a trajectory with automatic splitting on failures
-       * Performs candidate search once and reuses it for all sub-trajectories
-       * @param  trajectory   input trajectory data
-       * @param  config configuration of map matching algorithm
-       * @return split match result containing all successful and failed sub-trajectories
-       */
-      PySplitMatchResult pymatch_trajectory_split(const CORE::Trajectory &trajectory,
-                                                  const FastMapMatchConfig &config);
 
-    protected:
       /**
        * Get path distance between two candidates (always distance, regardless of mode)
        * @param  ca from candidate

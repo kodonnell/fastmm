@@ -1,8 +1,8 @@
 """
 Comprehensive tests for fastmm Python bindings.
 
-Run with: pytest test_fastmm.py -v
-Or: python test_fastmm.py
+Run with: pytest test_py -v
+Or: python test_py
 """
 
 import sys
@@ -11,8 +11,8 @@ from pathlib import Path
 # For running without installation
 sys.path.insert(0, "build/python/pybind11/Release")
 
-import fastmm
 import pytest
+from fastmm import FastMapMatch, MatchErrorCode, Network, NetworkGraph, Trajectory, TransitionMode
 
 
 class TestNetworkBasics:
@@ -20,26 +20,26 @@ class TestNetworkBasics:
 
     def test_create_empty_network(self):
         """Test creating an empty network."""
-        network = fastmm.Network()
+        network = Network()
         assert network.get_edge_count() == 0
         assert network.get_node_count() == 0
 
     def test_add_edge_with_coordinates(self):
         """Test adding edges using coordinate lists."""
-        network = fastmm.Network()
+        network = Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
         assert network.get_edge_count() == 1
         assert network.get_node_count() == 2
 
     def test_add_edge_with_speed(self):
         """Test adding edges with speed values."""
-        network = fastmm.Network()
-        network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50.0)
+        network = Network()
+        network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
         assert network.get_edge_count() == 1
 
     def test_add_multiple_edges(self):
         """Test adding multiple edges to build a network."""
-        network = fastmm.Network()
+        network = Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
         network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
         network.add_edge(3, source=2, target=4, geom=[(100, 0), (100, 100)])
@@ -48,31 +48,31 @@ class TestNetworkBasics:
 
     def test_add_edge_minimum_points(self):
         """Test that edges require at least 2 points."""
-        network = fastmm.Network()
+        network = Network()
         with pytest.raises(RuntimeError, match="at least 2 points"):
             network.add_edge(1, source=1, target=2, geom=[(0, 0)])
 
     def test_add_edge_empty_geometry(self):
         """Test that edges require non-empty geometry."""
-        network = fastmm.Network()
+        network = Network()
         with pytest.raises(RuntimeError, match="at least 2 points"):
             network.add_edge(1, source=1, target=2, geom=[])
 
     def test_add_edge_invalid_coordinate_format(self):
         """Test that coordinates must be tuples of (x, y)."""
-        network = fastmm.Network()
+        network = Network()
         with pytest.raises(RuntimeError, match="must be a tuple"):
             network.add_edge(1, source=1, target=2, geom=[(0, 0, 0)])  # 3D not allowed
 
     def test_build_rtree_on_empty_network(self):
         """Test that building rtree on empty network fails."""
-        network = fastmm.Network()
+        network = Network()
         with pytest.raises(RuntimeError, match="empty network"):
             network.finalize()
 
     def test_build_rtree_success(self):
         """Test successful rtree index building."""
-        network = fastmm.Network()
+        network = Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
         network.finalize()  # Should not raise
 
@@ -82,15 +82,13 @@ class TestRtreeIndexRequired:
 
     def test_matching_without_rtree_fails(self):
         """Test that matching fails if finalize() is not called."""
-        network = fastmm.Network()
-        network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50.0)
+        network = Network()
+        network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
         # Don't call finalize()
 
         # This should raise because rtree index was not built
         with pytest.raises(ValueError, match="must be finalized"):
-            _ = fastmm.FastMapMatch(
-                network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=1000, cache_dir=".cache"
-            )
+            _ = FastMapMatch(network, TransitionMode.SHORTEST, max_distance_between_candidates=1000, cache_dir=".cache")
 
 
 class TestTrajectoryCreation:
@@ -98,19 +96,19 @@ class TestTrajectoryCreation:
 
     def test_create_trajectory_from_xy(self):
         """Test creating trajectory from (x, y) tuples."""
-        traj = fastmm.Trajectory.from_xy_tuples(1, [(0, 0), (100, 0), (200, 0)])
+        traj = Trajectory.from_xy_tuples(1, [(0, 0), (100, 0), (200, 0)])
         assert traj.id == 1
         assert len(traj) == 3
 
     def test_create_trajectory_from_xyt(self):
         """Test creating trajectory from (x, y, t) tuples."""
-        traj = fastmm.Trajectory.from_xyt_tuples(2, [(0, 0, 0), (100, 0, 10), (200, 0, 20)])
+        traj = Trajectory.from_xyt_tuples(2, [(0, 0, 0), (100, 0, 10), (200, 0, 20)])
         assert traj.id == 2
         assert len(traj) == 3
 
     def test_trajectory_to_xy_tuples(self):
         """Test exporting trajectory to (x, y) tuples."""
-        traj = fastmm.Trajectory.from_xy_tuples(1, [(0, 0), (100, 0)])
+        traj = Trajectory.from_xy_tuples(1, [(0, 0), (100, 0)])
         xy_tuples = traj.to_xy_tuples()
         assert len(xy_tuples) == 2
         assert xy_tuples[0] == (0, 0)
@@ -118,7 +116,7 @@ class TestTrajectoryCreation:
 
     def test_trajectory_to_xyt_tuples(self):
         """Test exporting trajectory to (x, y, t) tuples."""
-        traj = fastmm.Trajectory.from_xyt_tuples(1, [(0, 0, 5), (100, 0, 10)])
+        traj = Trajectory.from_xyt_tuples(1, [(0, 0, 5), (100, 0, 10)])
         xyt_tuples = traj.to_xyt_tuples()
         assert len(xyt_tuples) == 2
         assert xyt_tuples[0] == (0, 0, 5)
@@ -127,12 +125,12 @@ class TestTrajectoryCreation:
     def test_trajectory_with_decreasing_timestamps_fails(self):
         """Test that creating trajectory with non-increasing timestamps fails."""
         with pytest.raises(ValueError, match="non-decreasing"):
-            fastmm.Trajectory.from_xyt_tuples(1, [(0, 0, 10), (100, 0, 5), (200, 0, 15)])
+            Trajectory.from_xyt_tuples(1, [(0, 0, 10), (100, 0, 5), (200, 0, 15)])
 
     def test_trajectory_with_equal_timestamps_succeeds(self):
         """Test that trajectory with equal consecutive timestamps is allowed."""
         # Non-decreasing means t[i] <= t[i+1], so equal timestamps are OK
-        traj = fastmm.Trajectory.from_xyt_tuples(1, [(0, 0, 10), (100, 0, 10), (200, 0, 15)])
+        traj = Trajectory.from_xyt_tuples(1, [(0, 0, 10), (100, 0, 10), (200, 0, 15)])
         assert traj.id == 1
         assert len(traj) == 3
 
@@ -142,64 +140,29 @@ class TestNetworkGraph:
 
     def test_create_graph_shortest_mode(self):
         """Test creating graph with SHORTEST mode (default)."""
-        network = fastmm.Network()
+        network = Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
         network.finalize()
-        graph = fastmm.NetworkGraph(network, fastmm.TransitionMode.SHORTEST)
+        graph = NetworkGraph(network, TransitionMode.SHORTEST)
         assert graph is not None
 
     def test_create_graph_fastest_mode_with_speed(self):
         """Test creating graph with FASTEST mode when edges have speed."""
-        network = fastmm.Network()
-        network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50.0)
-        network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)], speed=60.0)
+        network = Network()
+        network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
+        network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)], speed=60)
         network.finalize()
-        graph = fastmm.NetworkGraph(network, fastmm.TransitionMode.FASTEST)
+        graph = NetworkGraph(network, TransitionMode.FASTEST)
         assert graph is not None
 
     def test_create_graph_fastest_mode_without_speed_fails(self):
         """Test that FASTEST mode fails if any edge lacks speed."""
-        network = fastmm.Network()
-        network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50.0)
+        network = Network()
+        network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
         network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])  # No speed
         network.finalize()
         with pytest.raises(ValueError, match="speed"):
-            fastmm.NetworkGraph(network, fastmm.TransitionMode.FASTEST)
-
-
-class TestMatchingConfig:
-    """Test map matching configuration."""
-
-    def test_create_config_shortest_mode(self):
-        """Test creating config for SHORTEST mode."""
-        config = fastmm.FastMapMatchConfig(
-            k=8,
-            candidate_search_radius=50,
-            gps_error=50,
-            transition_mode=fastmm.TransitionMode.SHORTEST,
-        )
-        assert config.k == 8
-        assert config.candidate_search_radius == 50
-        assert config.gps_error == 50
-
-    def test_create_config_fastest_mode_with_reference_speed(self):
-        """Test creating config for FASTEST mode with reference_speed."""
-        config = fastmm.FastMapMatchConfig(
-            k=8,
-            candidate_search_radius=50,
-            gps_error=50,
-            transition_mode=fastmm.TransitionMode.FASTEST,
-            reference_speed=40.0,
-        )
-        assert config.reference_speed == 40.0
-
-    def test_config_defaults(self):
-        """Test configuration default values."""
-        config = fastmm.FastMapMatchConfig()
-        assert config.k == 8
-        assert config.candidate_search_radius == 50
-        assert config.gps_error == 50
-        assert config.reverse_tolerance == 0.0
+            NetworkGraph(network, TransitionMode.FASTEST)
 
 
 class TestShortestVsFastest:
@@ -208,7 +171,7 @@ class TestShortestVsFastest:
     @pytest.fixture
     def network_with_detour(self):
         """Create the network from example_combined.py with direct and detour routes."""
-        network = fastmm.Network()
+        network = Network()
         # Edge 1: A->B
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
         # Edge 2: B->C direct (slower)
@@ -227,29 +190,24 @@ class TestShortestVsFastest:
     def test_shortest_routing_prefers_direct_route(self, network_with_detour):
         """Test that SHORTEST routing prefers the direct route (Edge 2)."""
         network = network_with_detour
-        matcher = fastmm.FastMapMatch(
-            network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=5000, cache_dir=".cache"
+        matcher = FastMapMatch(
+            network, TransitionMode.SHORTEST, max_distance_between_candidates=5000, cache_dir=".cache"
         )
-        config = fastmm.FastMapMatchConfig(
-            k=8,
-            candidate_search_radius=15,
-            gps_error=5,
-            transition_mode=fastmm.TransitionMode.SHORTEST,
-        )
-
         # Trajectory through A->B->?->C->D
-        trajectory = fastmm.Trajectory.from_xyt_tuples(
-            1, [(25, 0, 0), (75, 0, 5), (150, 5, 10), (225, 0, 15), (275, 0, 20)]
-        )
-
-        result = matcher.pymatch_trajectory(trajectory, config)
-        assert result.error_code == fastmm.MatchErrorCode.SUCCESS
+        t = Trajectory.from_xyt_tuples(1, [(25, 0, 0), (75, 0, 5), (150, 5, 10), (225, 0, 15), (275, 0, 20)])
+        result = matcher.match(t, max_candidates=8, candidate_search_radius=15, gps_error=5)
+        assert len(result.subtrajectories) == 1
+        result = result.subtrajectories[0]
+        assert result.error_code == MatchErrorCode.SUCCESS
 
         # Extract route
         all_edges = []
         for segment in result.segments:
             for edge in segment.edges:
                 all_edges.append(edge.edge_id)
+                print(edge.points)
+
+        assert False
 
         # Remove consecutive duplicates
         route = []
@@ -263,22 +221,13 @@ class TestShortestVsFastest:
     def test_fastest_routing_prefers_detour_route(self, network_with_detour):
         """Test that FASTEST routing prefers the faster detour route (Edges 3->4->5)."""
         network = network_with_detour
-        matcher = fastmm.FastMapMatch(
-            network, fastmm.TransitionMode.FASTEST, max_time_between_candidates=5000, cache_dir=".cache"
-        )
-        config = fastmm.FastMapMatchConfig(
-            k=8,
-            candidate_search_radius=15,
-            gps_error=5,
-            transition_mode=fastmm.TransitionMode.FASTEST,
-            reference_speed=50,
-        )
+        matcher = FastMapMatch(network, TransitionMode.FASTEST, max_time_between_candidates=5000, cache_dir=".cache")
         # Trajectory through A->B->?->C->D
-        trajectory = fastmm.Trajectory.from_xyt_tuples(
-            1, [(25, 0, 0), (75, 0, 5), (150, 5, 10), (225, 0, 15), (275, 0, 20)]
-        )
-        result = matcher.pymatch_trajectory(trajectory, config)
-        assert result.error_code == fastmm.MatchErrorCode.SUCCESS
+        t = Trajectory.from_xyt_tuples(1, [(25, 0, 0), (75, 0, 5), (150, 5, 10), (225, 0, 15), (275, 0, 20)])
+        result = matcher.match(t, max_candidates=8, candidate_search_radius=15, gps_error=5, reference_speed=50)
+        assert len(result.subtrajectories) == 1
+        result = result.subtrajectories[0]
+        assert result.error_code == MatchErrorCode.SUCCESS
         # Extract route
         all_edges = []
         for segment in result.segments:
@@ -300,43 +249,44 @@ class TestMatchResult:
 
     def test_match_result_structure(self):
         """Test that match result has expected structure."""
-        network = fastmm.Network()
+        network = Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
         network.finalize()
 
-        matcher = fastmm.FastMapMatch(
+        matcher = FastMapMatch(
             network,
-            fastmm.TransitionMode.SHORTEST,
+            TransitionMode.SHORTEST,
             max_distance_between_candidates=1000,
             cache_dir=".cache/test_match_result_structure",
         )
-        config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=50, gps_error=50)
-        trajectory = fastmm.Trajectory.from_xy_tuples(1, [(10, 0), (90, 0)])
-
-        result = matcher.pymatch_trajectory(trajectory, config)
+        t = Trajectory.from_xy_tuples(1, [(10, 0), (90, 0)])
+        result = matcher.match(t, max_candidates=4, candidate_search_radius=50, gps_error=50)
+        assert result.id == 1
+        assert hasattr(result, "id")
+        assert hasattr(result, "subtrajectories")
 
         # Check result structure
-        assert hasattr(result, "id")
+        result = result.subtrajectories[0]
         assert hasattr(result, "error_code")
         assert hasattr(result, "segments")
-        assert hasattr(result, "unmatched_candidate_indices")
-        assert result.id == 1
+        assert hasattr(result, "start_index")
+        assert hasattr(result, "end_index")
 
     def test_match_result_segments(self):
         """Test accessing match result segments and edges."""
-        network = fastmm.Network()
+        network = Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
         network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)], speed=50)
         network.finalize()
 
-        matcher = fastmm.FastMapMatch(
-            network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=1000, cache_dir=".cache"
+        matcher = FastMapMatch(
+            network, TransitionMode.SHORTEST, max_distance_between_candidates=1000, cache_dir=".cache"
         )
-        config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=50, gps_error=50)
-        trajectory = fastmm.Trajectory.from_xy_tuples(1, [(10, 0), (150, 0)])
-
-        result = matcher.pymatch_trajectory(trajectory, config)
-        assert result.error_code == fastmm.MatchErrorCode.SUCCESS
+        t = Trajectory.from_xy_tuples(1, [(10, 0), (150, 0)])
+        result = matcher.match(t, max_candidates=4, candidate_search_radius=50, gps_error=50)
+        assert len(result.subtrajectories) == 1
+        result = result.subtrajectories[0]
+        assert result.error_code == MatchErrorCode.SUCCESS
 
         # Access segments
         for segment in result.segments:
@@ -353,43 +303,39 @@ class TestSplitMatching:
 
     def test_split_match_basic(self):
         """Test basic split matching with continuous trajectory."""
-        network = fastmm.Network()
+        network = Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
         network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
         network.finalize()
 
-        matcher = fastmm.FastMapMatch(
+        matcher = FastMapMatch(
             network,
-            fastmm.TransitionMode.SHORTEST,
+            TransitionMode.SHORTEST,
             max_distance_between_candidates=1000,
             cache_dir=".cache/test_split_match_result_structure",
         )
-        config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=50, gps_error=50)
-
         # Simple trajectory that should match completely
-        trajectory = fastmm.Trajectory.from_xy_tuples(1, [(10, 0), (50, 0), (150, 0)])
-        result = matcher.pymatch_trajectory_split(trajectory, config)
+        t = Trajectory.from_xy_tuples(1, [(10, 0), (50, 0), (150, 0)])
+        result = matcher.match(t, max_candidates=4, candidate_search_radius=50, gps_error=50)
 
         assert result.id == 1
         assert len(result.subtrajectories) >= 1
         # Should have at least one successful sub-trajectory
-        success_count = sum(1 for sub in result.subtrajectories if sub.error_code == fastmm.MatchErrorCode.SUCCESS)
+        success_count = sum(1 for sub in result.subtrajectories if sub.error_code == MatchErrorCode.SUCCESS)
         assert success_count >= 1
 
     def test_split_match_with_gap(self):
         """Test split matching with a point far from network (simulates failure)."""
-        network = fastmm.Network()
+        network = Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
         network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
         network.finalize()
 
-        matcher = fastmm.FastMapMatch(
-            network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=1000, cache_dir=".cache"
+        matcher = FastMapMatch(
+            network, TransitionMode.SHORTEST, max_distance_between_candidates=1000, cache_dir=".cache"
         )
-        config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=30, gps_error=20)
-
         # Trajectory with point far from network
-        trajectory = fastmm.Trajectory.from_xy_tuples(
+        t = Trajectory.from_xy_tuples(
             1,
             [
                 (10, 0),  # Point 0 - near network
@@ -399,8 +345,7 @@ class TestSplitMatching:
                 (180, 0),  # Point 4 - near network
             ],
         )
-        result = matcher.pymatch_trajectory_split(trajectory, config)
-
+        result = matcher.match(t, max_candidates=4, candidate_search_radius=30, gps_error=20)
         assert result.id == 1
 
         # Should have successfully matched portions (points 0-1 and 3-4)
@@ -409,7 +354,7 @@ class TestSplitMatching:
 
         # All returned sub-trajectories should be successful
         for sub in result.subtrajectories:
-            assert sub.error_code == fastmm.MatchErrorCode.SUCCESS
+            assert sub.error_code == MatchErrorCode.SUCCESS
 
         # Print results for debugging
         print(f"\nSplit match result: {len(result.subtrajectories)} sub-trajectories")
@@ -418,17 +363,15 @@ class TestSplitMatching:
 
     def test_split_match_result_structure(self):
         """Test the structure of split match results."""
-        network = fastmm.Network()
+        network = Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
         network.finalize()
 
-        matcher = fastmm.FastMapMatch(
-            network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=1000, cache_dir=".cache"
+        matcher = FastMapMatch(
+            network, TransitionMode.SHORTEST, max_distance_between_candidates=1000, cache_dir=".cache"
         )
-        config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=50, gps_error=50)
-        trajectory = fastmm.Trajectory.from_xy_tuples(1, [(10, 0), (50, 0)])
-
-        result = matcher.pymatch_trajectory_split(trajectory, config)
+        t = Trajectory.from_xy_tuples(1, [(10, 0), (50, 0)])
+        result = matcher.match(t, max_candidates=4, candidate_search_radius=50, gps_error=50)
 
         # Check result structure
         assert hasattr(result, "id")
@@ -444,7 +387,7 @@ class TestSplitMatching:
             assert isinstance(sub.segments, list)
 
             # All returned sub-trajectories should be successful
-            assert sub.error_code == fastmm.MatchErrorCode.SUCCESS
+            assert sub.error_code == MatchErrorCode.SUCCESS
 
             # For 2+ points, should have at least 1 segment
             if sub.end_index > sub.start_index:
@@ -453,7 +396,7 @@ class TestSplitMatching:
     def test_split_match_disconnected_by_distance(self):
         """Test split matching when points are too far apart for UBODT (disconnected layers)."""
         # Create a long network
-        network = fastmm.Network()
+        network = Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
         network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
         network.add_edge(3, source=3, target=4, geom=[(200, 0), (300, 0)])
@@ -464,27 +407,25 @@ class TestSplitMatching:
         network.add_edge(8, source=8, target=9, geom=[(700, 0), (800, 0)])
         network.finalize()
 
-        matcher = fastmm.FastMapMatch(
-            network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=250, cache_dir=".cache"
+        matcher = FastMapMatch(
+            network, TransitionMode.SHORTEST, max_distance_between_candidates=250, cache_dir=".cache"
         )
-        # Use k=1 and small radius to ensure we get the closest edge only
-        config = fastmm.FastMapMatchConfig(k=1, candidate_search_radius=30, gps_error=50)
-
+        # Use max_candidates=1 and small radius to ensure we get the closest edge only
         # First, test with regular matching to see what happens
-        test_traj = fastmm.Trajectory.from_xy_tuples(
+        t = Trajectory.from_xy_tuples(
             0,
             [
                 (150, 0),  # Point on edge 2 (middle of 100-200)
                 (750, 0),  # Point on edge 8 (middle of 700-800) - very far away
             ],
         )
-        test_result = matcher.pymatch_trajectory(test_traj, config)
-        print(f"\nRegular match result (should fail with DISCONNECTED_LAYERS): {test_result.error_code}")
+        result = matcher.match(t, max_candidates=1, candidate_search_radius=30, gps_error=50)
+        assert len(result.subtrajectories) == 0
 
         # Create trajectory with points that:
         # - All have candidates (near roads)
         # - But some consecutive points are beyond UBODT delta distance
-        trajectory = fastmm.Trajectory.from_xy_tuples(
+        t = Trajectory.from_xy_tuples(
             1,
             [
                 (50, 0),  # Point 0 - on edge 1 (middle of 0-100)
@@ -493,8 +434,7 @@ class TestSplitMatching:
                 (780, 0),  # Point 3 - also on edge 8
             ],
         )
-        result = matcher.pymatch_trajectory_split(trajectory, config)
-
+        result = matcher.match(t, max_candidates=1, candidate_search_radius=30, gps_error=50)
         assert result.id == 1
 
         # Should split into at least 2 sub-trajectories due to disconnection
@@ -505,7 +445,7 @@ class TestSplitMatching:
 
         # All returned sub-trajectories should be successful
         for sub in result.subtrajectories:
-            assert sub.error_code == fastmm.MatchErrorCode.SUCCESS
+            assert sub.error_code == MatchErrorCode.SUCCESS
 
         # Print results for debugging
         print(f"\nDisconnected layers test: {len(result.subtrajectories)} sub-trajectories")
@@ -522,59 +462,57 @@ class TestReversedGeometry:
     def test_fails_to_reverse_if_outside_tolerance(self):
         """Reverse tolerance of e.g. 10 units only allows reversing 10 units of edge length, so if reverse is 50
         units, it should fail."""
-        network = fastmm.Network()
+        network = Network()
         # Create a simple straight road
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
         network.finalize()
 
-        matcher = fastmm.FastMapMatch(
+        matcher = FastMapMatch(
             network,
-            fastmm.TransitionMode.SHORTEST,
+            TransitionMode.SHORTEST,
             max_distance_between_candidates=1000,
             cache_dir=".cache/test_reversed",
         )
 
         # Allow reverse tolerance for backward movement
-        config = fastmm.FastMapMatchConfig(
-            k=4,
+        # GPS points that move backward: 80m -> 30m on same edge
+        t = Trajectory.from_xy_tuples(1, [(80, 0), (30, 0)])
+
+        result = matcher.match(
+            t,
+            max_candidates=4,
             candidate_search_radius=50,
             gps_error=50,
-            reverse_tolerance=10,  # Allow 10 units backward movement
+            reverse_tolerance=10,  # Only allow 10m backward
         )
-
-        # GPS points that move backward: 80m -> 30m on same edge
-        trajectory = fastmm.Trajectory.from_xy_tuples(1, [(80, 0), (30, 0)])
-
-        result = matcher.pymatch_trajectory(trajectory, config)
-        assert result.error_code == fastmm.MatchErrorCode.DISCONNECTED_LAYERS
+        assert len(result.subtrajectories) == 0
 
     def test_reversed_flag_on_backward_movement(self):
         """Test that reversed flag is set when GPS moves backward on same edge."""
-        network = fastmm.Network()
+        network = Network()
         # Create a simple straight road
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
         network.finalize()
-
-        matcher = fastmm.FastMapMatch(
+        matcher = FastMapMatch(
             network,
-            fastmm.TransitionMode.SHORTEST,
+            TransitionMode.SHORTEST,
             max_distance_between_candidates=1000,
             cache_dir=".cache/test_reversed",
         )
 
         # Allow reverse tolerance for backward movement
-        config = fastmm.FastMapMatchConfig(
-            k=4,
+        # GPS points that move backward: 80m -> 30m on same edge
+        t = Trajectory.from_xy_tuples(1, [(80, 0), (30, 0)])
+        result = matcher.match(
+            t,
+            max_candidates=4,
             candidate_search_radius=50,
             gps_error=50,
             reverse_tolerance=60,  # Allow 60m backward movement
         )
-
-        # GPS points that move backward: 80m -> 30m on same edge
-        trajectory = fastmm.Trajectory.from_xy_tuples(1, [(80, 0), (30, 0)])
-
-        result = matcher.pymatch_trajectory(trajectory, config)
-        assert result.error_code == fastmm.MatchErrorCode.SUCCESS
+        assert len(result.subtrajectories) == 1
+        result = result.subtrajectories[0]
+        assert result.error_code == MatchErrorCode.SUCCESS
 
         # Should have one segment with one edge
         assert len(result.segments) == 1
@@ -600,23 +538,22 @@ class TestReversedGeometry:
 
     def test_not_reversed_on_forward_movement(self):
         """Test that reversed flag is False for normal forward movement."""
-        network = fastmm.Network()
+        network = Network()
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
         network.finalize()
 
-        matcher = fastmm.FastMapMatch(
+        matcher = FastMapMatch(
             network,
-            fastmm.TransitionMode.SHORTEST,
+            TransitionMode.SHORTEST,
             max_distance_between_candidates=1000,
             cache_dir=".cache/test_not_reversed",
         )
-        config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=50, gps_error=50)
-
         # Normal forward movement: 30m -> 80m
-        trajectory = fastmm.Trajectory.from_xy_tuples(1, [(30, 0), (80, 0)])
-
-        result = matcher.pymatch_trajectory(trajectory, config)
-        assert result.error_code == fastmm.MatchErrorCode.SUCCESS
+        t = Trajectory.from_xy_tuples(1, [(30, 0), (80, 0)])
+        result = matcher.match(t, max_candidates=4, candidate_search_radius=50, gps_error=50)
+        assert len(result.subtrajectories) == 1
+        result = result.subtrajectories[0]
+        assert result.error_code == MatchErrorCode.SUCCESS
 
         segment = result.segments[0]
         edge = segment.edges[0]
@@ -629,24 +566,24 @@ class TestReversedGeometry:
 
     def test_reversed_geometry_consistency(self):
         """Test that reversed geometry maintains spatial consistency."""
-        network = fastmm.Network()
+        network = Network()
         # Multi-segment linestring
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (50, 0), (100, 0)], speed=50)
         network.finalize()
 
-        matcher = fastmm.FastMapMatch(
+        matcher = FastMapMatch(
             network,
-            fastmm.TransitionMode.SHORTEST,
+            TransitionMode.SHORTEST,
             max_distance_between_candidates=1000,
             cache_dir=".cache/test_reversed_consistency",
         )
-        config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=50, gps_error=50, reverse_tolerance=60)
-
         # Backward movement on multi-segment edge
-        trajectory = fastmm.Trajectory.from_xy_tuples(1, [(90, 0), (40, 0)])
+        t = Trajectory.from_xy_tuples(1, [(90, 0), (40, 0)])
+        result = matcher.match(t, max_candidates=4, candidate_search_radius=50, gps_error=50, reverse_tolerance=60)
+        assert len(result.subtrajectories) == 1
 
-        result = matcher.pymatch_trajectory(trajectory, config)
-        assert result.error_code == fastmm.MatchErrorCode.SUCCESS
+        result = result.subtrajectories[0]
+        assert result.error_code == MatchErrorCode.SUCCESS
 
         edge = result.segments[0].edges[0]
         assert edge.reversed is True
