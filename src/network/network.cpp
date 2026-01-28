@@ -8,12 +8,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <iomanip>
-
-#ifdef BOOST_OS_WINDOWS
-#include <boost/uuid/detail/sha1.hpp>
-#else
-#include <boost/uuid/detail/sha1.hpp>
-#endif
+#include <boost/version.hpp> // defines BOOST_VERSION as e.g. 109000 for 1.90.0
 
 // Data structures for Rtree
 #include <boost/geometry/index/rtree.hpp>
@@ -412,14 +407,29 @@ std::string Network::compute_hash() const
     sha1.process_bytes(&edge.length, sizeof(edge.length));
   }
 
+#if BOOST_VERSION >= 108500 // 1.85.0 = 108500; covers 1.85 → 1.90+
+  unsigned char digest[20];
+#else
   unsigned int digest[5];
+#endif
   sha1.get_digest(digest);
 
+  // Format first 16 bytes (128 bits) as 32 hex chars
   std::ostringstream oss;
   oss << std::hex << std::setfill('0');
+#if BOOST_VERSION >= 108500
+  // New Boost: byte array → format byte-by-byte
+  for (int i = 0; i < 16; ++i)
+  {
+    oss << std::setw(2) << static_cast<unsigned>(digest[i]);
+  }
+#else
+  // Old Boost: word array (big-endian words? but Boost writes in network byte order)
+  // Take first 4 words (128 bits)
   for (int i = 0; i < 4; ++i)
   {
     oss << std::setw(8) << digest[i];
   }
+#endif
   return oss.str();
 }
