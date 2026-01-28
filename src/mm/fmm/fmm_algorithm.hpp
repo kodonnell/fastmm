@@ -23,14 +23,6 @@ namespace FASTMM
 {
   namespace MM
   {
-    /**
-     * Routing mode for map matching
-     */
-    enum class TransitionMode
-    {
-      SHORTEST, /**< Distance-based routing */
-      FASTEST   /**< Time-based routing */
-    };
 
     /**
      * Configuration class for fmm algorithm
@@ -68,16 +60,21 @@ namespace FASTMM
     {
     public:
       /**
-       * Constructor of Fast map matching model
-       * @param network road network
-       * @param graph road network graph
-       * @param ubodt Upperbounded origin destination table
+       * User-friendly constructor: takes both max_distance_between_candidates and max_time_between_candidates.
+       * Only the relevant one is used depending on mode.
+       * @param network road network (must be finalized)
+       * @param mode transition mode (SHORTEST or FASTEST)
+       * @param max_distance_between_candidates maximum distance in meters (for SHORTEST mode)
+       * @param max_time_between_candidates maximum time in seconds (for FASTEST mode)
+       * @param cache_dir directory for UBODT cache files
+       * @throws std::invalid_argument if parameters are invalid
+       * @throws std::runtime_error if UBODT generation/loading fails
        */
       FastMapMatch(const NETWORK::Network &network,
-                   const NETWORK::NetworkGraph &graph,
-                   std::shared_ptr<UBODT> ubodt)
-          : network_(network), graph_(graph), ubodt_(ubodt) {
-            };
+                   TransitionMode mode,
+                   std::optional<double> max_distance_between_candidates = std::nullopt,
+                   std::optional<double> max_time_between_candidates = std::nullopt,
+                   const std::string &cache_dir = "./ubodt_cache");
       /**
        * Match a trajectory to the road network
        * @param  trajectory   input trajector data
@@ -170,7 +167,7 @@ namespace FASTMM
 
     private:
       const NETWORK::Network &network_;
-      const NETWORK::NetworkGraph &graph_;
+      NETWORK::NetworkGraph graph_;
       std::shared_ptr<UBODT> ubodt_;
     };
   }

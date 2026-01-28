@@ -86,22 +86,11 @@ class TestRtreeIndexRequired:
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50.0)
         # Don't call build_rtree_index()
 
-        graph = fastmm.NetworkGraph(network, fastmm.TransitionMode.SHORTEST)
-        cache_dir = Path("./.cache")
-        cache_dir.mkdir(exist_ok=True)
-        ubodt_path = cache_dir / "test_ubodt.bin"
-
-        ubodt_gen = fastmm.UBODTGenAlgorithm(network, graph)
-        ubodt_gen.generate_ubodt(str(ubodt_path), delta=1000)
-        ubodt = fastmm.UBODT.read_ubodt_binary(str(ubodt_path), multiplier=5000)
-
-        matcher = fastmm.FastMapMatch(network, graph, ubodt)
-        config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=50, gps_error=50)
-        trajectory = fastmm.Trajectory.from_xy_tuples(1, [(50, 0), (75, 0)])
-
         # This should raise because rtree index was not built
-        with pytest.raises(RuntimeError, match="Spatial index not built"):
-            matcher.pymatch_trajectory(trajectory, config)
+        with pytest.raises(ValueError, match="must be finalized"):
+            _ = fastmm.FastMapMatch(
+                network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=1000, cache_dir=".cache"
+            )
 
 
 class TestTrajectoryCreation:
@@ -238,17 +227,9 @@ class TestShortestVsFastest:
     def test_shortest_routing_prefers_direct_route(self, network_with_detour):
         """Test that SHORTEST routing prefers the direct route (Edge 2)."""
         network = network_with_detour
-        graph = fastmm.NetworkGraph(network, fastmm.TransitionMode.SHORTEST)
-
-        cache_dir = Path("./.cache")
-        cache_dir.mkdir(exist_ok=True)
-        ubodt_path = cache_dir / "test_shortest.bin"
-
-        ubodt_gen = fastmm.UBODTGenAlgorithm(network, graph)
-        ubodt_gen.generate_ubodt(str(ubodt_path), delta=5000)
-        ubodt = fastmm.UBODT.read_ubodt_binary(str(ubodt_path), multiplier=50000)
-
-        matcher = fastmm.FastMapMatch(network, graph, ubodt)
+        matcher = fastmm.FastMapMatch(
+            network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=5000, cache_dir=".cache"
+        )
         config = fastmm.FastMapMatchConfig(
             k=8,
             candidate_search_radius=15,
@@ -282,17 +263,9 @@ class TestShortestVsFastest:
     def test_fastest_routing_prefers_detour_route(self, network_with_detour):
         """Test that FASTEST routing prefers the faster detour route (Edges 3->4->5)."""
         network = network_with_detour
-        graph = fastmm.NetworkGraph(network, fastmm.TransitionMode.FASTEST)
-
-        cache_dir = Path("./.cache")
-        cache_dir.mkdir(exist_ok=True)
-        ubodt_path = cache_dir / "test_fastest.bin"
-
-        ubodt_gen = fastmm.UBODTGenAlgorithm(network, graph)
-        ubodt_gen.generate_ubodt(str(ubodt_path), delta=5000)
-        ubodt = fastmm.UBODT.read_ubodt_binary(str(ubodt_path), multiplier=50000)
-
-        matcher = fastmm.FastMapMatch(network, graph, ubodt)
+        matcher = fastmm.FastMapMatch(
+            network, fastmm.TransitionMode.FASTEST, max_time_between_candidates=5000, cache_dir=".cache"
+        )
         config = fastmm.FastMapMatchConfig(
             k=8,
             candidate_search_radius=15,
@@ -300,15 +273,12 @@ class TestShortestVsFastest:
             transition_mode=fastmm.TransitionMode.FASTEST,
             reference_speed=50,
         )
-
         # Trajectory through A->B->?->C->D
         trajectory = fastmm.Trajectory.from_xyt_tuples(
             1, [(25, 0, 0), (75, 0, 5), (150, 5, 10), (225, 0, 15), (275, 0, 20)]
         )
-
         result = matcher.pymatch_trajectory(trajectory, config)
         assert result.error_code == fastmm.MatchErrorCode.SUCCESS
-
         # Extract route
         all_edges = []
         for segment in result.segments:
@@ -334,16 +304,12 @@ class TestMatchResult:
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
         network.build_rtree_index()
 
-        graph = fastmm.NetworkGraph(network)
-        cache_dir = Path("./.cache")
-        cache_dir.mkdir(exist_ok=True)
-        ubodt_path = cache_dir / "test_result.bin"
-
-        ubodt_gen = fastmm.UBODTGenAlgorithm(network, graph)
-        ubodt_gen.generate_ubodt(str(ubodt_path), delta=1000)
-        ubodt = fastmm.UBODT.read_ubodt_binary(str(ubodt_path), multiplier=5000)
-
-        matcher = fastmm.FastMapMatch(network, graph, ubodt)
+        matcher = fastmm.FastMapMatch(
+            network,
+            fastmm.TransitionMode.SHORTEST,
+            max_distance_between_candidates=1000,
+            cache_dir=".cache/test_match_result_structure",
+        )
         config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=50, gps_error=50)
         trajectory = fastmm.Trajectory.from_xy_tuples(1, [(10, 0), (90, 0)])
 
@@ -363,16 +329,9 @@ class TestMatchResult:
         network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)], speed=50)
         network.build_rtree_index()
 
-        graph = fastmm.NetworkGraph(network)
-        cache_dir = Path("./.cache")
-        cache_dir.mkdir(exist_ok=True)
-        ubodt_path = cache_dir / "test_segments.bin"
-
-        ubodt_gen = fastmm.UBODTGenAlgorithm(network, graph)
-        ubodt_gen.generate_ubodt(str(ubodt_path), delta=1000)
-        ubodt = fastmm.UBODT.read_ubodt_binary(str(ubodt_path), multiplier=5000)
-
-        matcher = fastmm.FastMapMatch(network, graph, ubodt)
+        matcher = fastmm.FastMapMatch(
+            network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=1000, cache_dir=".cache"
+        )
         config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=50, gps_error=50)
         trajectory = fastmm.Trajectory.from_xy_tuples(1, [(10, 0), (150, 0)])
 
@@ -399,16 +358,12 @@ class TestSplitMatching:
         network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
         network.build_rtree_index()
 
-        graph = fastmm.NetworkGraph(network)
-        cache_dir = Path("./.cache")
-        cache_dir.mkdir(exist_ok=True)
-        ubodt_path = cache_dir / "test_split.bin"
-
-        ubodt_gen = fastmm.UBODTGenAlgorithm(network, graph)
-        ubodt_gen.generate_ubodt(str(ubodt_path), delta=1000)
-        ubodt = fastmm.UBODT.read_ubodt_binary(str(ubodt_path), multiplier=5000)
-
-        matcher = fastmm.FastMapMatch(network, graph, ubodt)
+        matcher = fastmm.FastMapMatch(
+            network,
+            fastmm.TransitionMode.SHORTEST,
+            max_distance_between_candidates=1000,
+            cache_dir=".cache/test_split_match_result_structure",
+        )
         config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=50, gps_error=50)
 
         # Simple trajectory that should match completely
@@ -428,16 +383,9 @@ class TestSplitMatching:
         network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
         network.build_rtree_index()
 
-        graph = fastmm.NetworkGraph(network)
-        cache_dir = Path("./.cache")
-        cache_dir.mkdir(exist_ok=True)
-        ubodt_path = cache_dir / "test_split_gap.bin"
-
-        ubodt_gen = fastmm.UBODTGenAlgorithm(network, graph)
-        ubodt_gen.generate_ubodt(str(ubodt_path), delta=1000)
-        ubodt = fastmm.UBODT.read_ubodt_binary(str(ubodt_path), multiplier=5000)
-
-        matcher = fastmm.FastMapMatch(network, graph, ubodt)
+        matcher = fastmm.FastMapMatch(
+            network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=1000, cache_dir=".cache"
+        )
         config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=30, gps_error=20)
 
         # Trajectory with point far from network
@@ -474,16 +422,9 @@ class TestSplitMatching:
         network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
         network.build_rtree_index()
 
-        graph = fastmm.NetworkGraph(network)
-        cache_dir = Path("./.cache")
-        cache_dir.mkdir(exist_ok=True)
-        ubodt_path = cache_dir / "test_split_struct.bin"
-
-        ubodt_gen = fastmm.UBODTGenAlgorithm(network, graph)
-        ubodt_gen.generate_ubodt(str(ubodt_path), delta=1000)
-        ubodt = fastmm.UBODT.read_ubodt_binary(str(ubodt_path), multiplier=5000)
-
-        matcher = fastmm.FastMapMatch(network, graph, ubodt)
+        matcher = fastmm.FastMapMatch(
+            network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=1000, cache_dir=".cache"
+        )
         config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=50, gps_error=50)
         trajectory = fastmm.Trajectory.from_xy_tuples(1, [(10, 0), (50, 0)])
 
@@ -523,24 +464,9 @@ class TestSplitMatching:
         network.add_edge(8, source=8, target=9, geom=[(700, 0), (800, 0)])
         network.build_rtree_index()
 
-        graph = fastmm.NetworkGraph(network)
-        cache_dir = Path("./.cache")
-        cache_dir.mkdir(exist_ok=True)
-
-        # Use a specific delta value for this test
-        delta = 250
-        ubodt_path = cache_dir / f"test_split_disconnected_delta{delta}.bin"
-
-        # Delete old UBODT if it exists to ensure fresh generation
-        if ubodt_path.exists():
-            ubodt_path.unlink()
-
-        # Use delta=250 so paths requiring >250 units won't be in UBODT
-        ubodt_gen = fastmm.UBODTGenAlgorithm(network, graph)
-        ubodt_gen.generate_ubodt(str(ubodt_path), delta=delta)
-        ubodt = fastmm.UBODT.read_ubodt_binary(str(ubodt_path), multiplier=1000)
-
-        matcher = fastmm.FastMapMatch(network, graph, ubodt)
+        matcher = fastmm.FastMapMatch(
+            network, fastmm.TransitionMode.SHORTEST, max_distance_between_candidates=250, cache_dir=".cache"
+        )
         # Use k=1 and small radius to ensure we get the closest edge only
         config = fastmm.FastMapMatchConfig(k=1, candidate_search_radius=30, gps_error=50)
 

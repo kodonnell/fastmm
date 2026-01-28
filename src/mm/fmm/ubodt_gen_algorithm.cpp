@@ -14,18 +14,18 @@ using namespace FASTMM::CORE;
 using namespace FASTMM::NETWORK;
 using namespace FASTMM::MM;
 
-void UBODTGenAlgorithm::generate_ubodt(const std::string &filename, double delta) const
+void UBODTGenAlgorithm::generate_ubodt(const std::string &filename, double delta, const std::string &network_hash) const
 {
   std::ostringstream oss;
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-  precompute_ubodt_omp(filename, delta);
+  precompute_ubodt_omp(filename, delta, network_hash);
   std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
   double time_spent = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() / 1000.;
   SPDLOG_INFO("Status: success");
   SPDLOG_INFO("Time takes {} seconds", time_spent);
 };
 
-void UBODTGenAlgorithm::precompute_ubodt_omp(const std::string &filename, double delta) const
+void UBODTGenAlgorithm::precompute_ubodt_omp(const std::string &filename, double delta, const std::string &network_hash) const
 {
   int num_vertices = ng_.get_num_vertices();
   int step_size = num_vertices / 10;
@@ -35,6 +35,15 @@ void UBODTGenAlgorithm::precompute_ubodt_omp(const std::string &filename, double
   SPDLOG_INFO("Start to generate UBODT with delta {}", delta);
 
   boost::archive::binary_oarchive oa(myfile);
+
+  // Write metadata header
+  int version = 1;
+  int mode_int = static_cast<int>(mode_);
+  int multiplier = num_vertices + 1; // Auto-computed: num_vertices + 1
+  oa << version << mode_int << delta << num_vertices << multiplier << network_hash;
+  SPDLOG_INFO("UBODT metadata: version={}, mode={}, delta={}, num_vertices={}, multiplier={}, hash={}",
+              version, mode_int, delta, num_vertices, multiplier, network_hash);
+
   int progress = 0;
 #pragma omp parallel
   {
@@ -94,8 +103,7 @@ void UBODTGenAlgorithm::write_result_binary(boost::archive::binary_oarchive &str
            successor,
            prev_node,
            edge_index,
-           dmap[cur_node],
-           nullptr});
+           dmap[cur_node]});
     }
   }
 #pragma omp critical

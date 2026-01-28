@@ -6,6 +6,14 @@
 #include <math.h>    // Calulating probability
 #include <algorithm> // Partial sort copy
 #include <stdexcept>
+#include <sstream>
+#include <iomanip>
+
+#ifdef BOOST_OS_WINDOWS
+#include <boost/uuid/detail/sha1.hpp>
+#else
+#include <boost/uuid/detail/sha1.hpp>
+#endif
 
 // Data structures for Rtree
 #include <boost/geometry/index/rtree.hpp>
@@ -39,6 +47,12 @@ void Network::add_edge(EdgeID edge_id, NodeID source, NodeID target,
                        const FASTMM::CORE::LineString &geom,
                        std::optional<double> speed)
 {
+  // Check if network is finalized
+  if (finalized)
+  {
+    throw std::runtime_error("Cannot add edge to finalized network. Network is frozen after build_rtree_index().");
+  }
+
   // Validate speed if provided
   if (speed.has_value() && speed.value() <= 0)
   {
@@ -127,6 +141,12 @@ Point Network::get_node_geom_from_idx(NodeIndex index) const
   return vertex_points[index];
 }
 
+// If finalised:
+bool Network::is_finalized() const
+{
+  return finalized;
+}
+
 // Construct a Rtree using the vector of edges
 void Network::build_rtree_index()
 {
@@ -148,7 +168,9 @@ void Network::build_rtree_index()
     rtree.insert(std::make_pair(b, edge));
   }
   rtree_built = true;
+  finalized = true; // Finalize the network - no more edges can be added
   SPDLOG_DEBUG("Create boost rtree done");
+  SPDLOG_INFO("Network finalized with {} vertices and {} edges", num_vertices, edges.size());
 }
 
 TrajectoryCandidates Network::search_tr_cs_knn(Trajectory &trajectory, std::size_t k, double radius) const
@@ -346,4 +368,50 @@ void Network::append_segs_to_line(LineString *line,
       line->add_point(segs.get_x(i), segs.get_y(i));
     }
   }
+}
+
+std::string Network::compute_hash() const
+{
+  boost::uuids::detail::sha1 sha1;
+
+  // Hash edge count
+  int edge_count = edges.size();
+  sha1.process_bytes(&edge_count, sizeof(edge_count));
+
+  // Hash edges
+  for (int i = 0; i < edge_count; i += 1)
+  {
+    const Edge &edge = edges[i];
+    sha1.process_bytes(&edge.id, sizeof(edge.id));
+    sha1.process_bytes(&edge.source, sizeof(edge.source));
+    sha1.process_bytes(&edge.target, sizeof(edge.target));
+    // Include speed if available (affects FASTEST mode)
+    if (edge.speed.has_value())
+    {
+      double speed_val = edge.speed.value();
+      sha1.process_bytes(&speed_val, sizeof(speed_val));
+    }
+    // Add geometry:
+    const LineString &geom = edge.geom;
+    int num_points = geom.get_num_points();
+    sha1.process_bytes(&num_points, sizeof(num_points));
+    for (int j = 0; j < num_points; ++j)
+    {
+      double x = geom.get_x(j);
+      double y = geom.get_y(j);
+      sha1.process_bytes(&x, sizeof(x));
+      sha1.process_bytes(&y, sizeof(y));
+    }
+    // And length:
+    sha1.process_bytes(&edge.length, sizeof(edge.length));
+  }
+
+  // Get digest
+  unsigned int digest[5];
+  sha1.get_digest(digest);
+
+  // Convert to hex string (first 32 characters)
+  std::ostringstream oss;
+  oss << std::hex << std::setfill('0') << std::setw(32) << digest[0];
+  return oss.str();
 }

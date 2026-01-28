@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Optional
 
 import fastmm
 
@@ -8,25 +9,82 @@ logging.basicConfig(level=logging.INFO)
 
 
 class MapMatcher:
-    """High-level map matcher that handles matching failures and time interpolation.
+    """High-level map matcher with automatic UBODT caching and mode validation.
 
-    This class wraps around the low-level FASTMM matcher and provides automatic
-    handling of matching failures by splitting trajectories and interpolating
-    timestamps onto matched points.
+    This class wraps the low-level FastMM matcher and provides:
+    - Automatic UBODT generation and caching based on network and mode
+    - Mode validation (ensures UBODT matches graph mode)
+    - Simplified API with clear parameter names
+
+    Example:
+        # SHORTEST mode (distance-based)
+        network = fastmm.Network()
+        # ... add edges ...
+        network.build_rtree_index()
+
+        matcher = MapMatcher(
+            network=network,
+            mode=fastmm.TransitionMode.SHORTEST,
+            max_distance_between_candidates=300.0,  # meters
+            cache_dir="./cache"
+        )
+
+        # FASTEST mode (time-based)
+        matcher = MapMatcher(
+            network=network,
+            mode=fastmm.TransitionMode.FASTEST,
+            max_time_between_candidates=20.0,  # seconds
+            cache_dir="./cache"
+        )
     """
 
-    def __init__(self, network: fastmm.Network, ubodt_max_djikstra_distance: float, cache_dir: Path):
+    def __init__(
+        self,
+        network: fastmm.Network,
+        mode: fastmm.TransitionMode = fastmm.TransitionMode.SHORTEST,
+        max_distance_between_candidates: Optional[float] = None,
+        max_time_between_candidates: Optional[float] = None,
+        cache_dir: Optional[Path] = None,
+    ):
+        """Initialize the MapMatcher.
+
+        Args:
+            network: Road network with edges and rtree index built
+            mode: Routing mode (SHORTEST for distance-based, FASTEST for time-based)
+            max_distance_between_candidates: Maximum distance in meters for UBODT delta (SHORTEST mode only)
+            max_time_between_candidates: Maximum time in seconds for UBODT delta (FASTEST mode only)
+            cache_dir: Directory for caching UBODT files (default: ./ubodt_cache)
+
+        Raises:
+            ValueError: If mode/delta parameter mismatch or network incompatible with mode
+        """
         self.network = network
-        logger.info(f"Network with {self.network.get_node_count()} nodes and {self.network.get_edge_count()} edges")
-        self.ubodt_max_djikstra_distance = ubodt_max_djikstra_distance
-        self.cache_dir = Path(cache_dir)
-        logger.info("Creating the network graph")
-        self.graph = fastmm.NetworkGraph(self.network)
-        ubodt_path = self.cache_dir / f"ubodt-{self.ubodt_max_djikstra_distance}.bin"
-        if not ubodt_path.exists():
-            logger.info(f"Generating UBODT and saving to {ubodt_path}")
-            ubodt = fastmm.UBODTGenAlgorithm(self.network, self.graph)
-            ubodt.generate_ubodt(str(ubodt_path), self.ubodt_max_djikstra_distance)
-        logger.info(f"Loading UBODT from {ubodt_path}")
-        self.ubodt = fastmm.UBODT.read_ubodt_binary(str(ubodt_path), 50000)
-        self.model = fastmm.FastMapMatch(self.network, self.graph, self.ubodt)
+        self.mode = mode
+
+        # Validate and set delta based on mode
+        if mode == fastmm.TransitionMode.SHORTEST:
+            if max_distance_between_candidates is None:
+                raise ValueError("max_distance_between_candidates required for SHORTEST mode")
+            if max_time_between_candidates is not None:
+                logger.warning("max_time_between_candidates ignored in SHORTEST mode")
+            delta = max_distance_between_candidates
+            mode_name = "shortest"
+        elif mode == fastmm.TransitionMode.FASTEST:
+            if max_time_between_candidates is None:
+                raise ValueError("max_time_between_candidates required for FASTEST mode")
+            if max_distance_between_candidates is not None:
+                logger.warning("max_distance_between_candidates ignored in FASTEST mode")
+            delta = max_time_between_candidates
+            mode_name = "fastest"
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
+
+        logger.info(f"Network with {network.get_node_count()} nodes and {network.get_edge_count()} edges")
+        logger.info(f"Mode: {mode_name.upper()}, delta: {delta}")
+
+        # Set up cache directory
+        cache_dir_path = Path(cache_dir) if cache_dir else Path("./ubodt_cache")
+
+        # Create the matcher - it handles all UBODT management internally
+        self.model = fastmm.FastMapMatch(network, mode, delta, str(cache_dir_path))
+        logger.info("MapMatcher initialized successfully")

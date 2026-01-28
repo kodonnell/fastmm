@@ -3,14 +3,148 @@
 //
 
 #include "mm/fmm/fmm_algorithm.hpp"
+#include "mm/fmm/ubodt_gen_algorithm.hpp"
 #include "algorithm/geom_algorithm.hpp"
 #include "util/util.hpp"
 #include "util/debug.hpp"
+
+#include <filesystem>
+#include <sstream>
+#include <iomanip>
 
 using namespace FASTMM;
 using namespace FASTMM::CORE;
 using namespace FASTMM::NETWORK;
 using namespace FASTMM::MM;
+
+FastMapMatch::FastMapMatch(const Network &network,
+                           TransitionMode mode,
+                           std::optional<double> max_distance_between_candidates,
+                           std::optional<double> max_time_between_candidates,
+                           const std::string &cache_dir)
+    : network_(network), graph_(network, mode), ubodt_(nullptr)
+{
+    // Validate inputs
+    double delta = 0.0;
+    if (mode == TransitionMode::SHORTEST)
+    {
+        if (!max_distance_between_candidates.has_value() || max_distance_between_candidates.value() <= 0)
+        {
+            throw std::invalid_argument("FastMapMatch: max_distance_between_candidates must be positive for SHORTEST mode");
+        }
+        delta = max_distance_between_candidates.value();
+    }
+    else if (mode == TransitionMode::FASTEST)
+    {
+        if (!max_time_between_candidates.has_value() || max_time_between_candidates.value() <= 0)
+        {
+            throw std::invalid_argument("FastMapMatch: max_time_between_candidates must be positive for FASTEST mode");
+        }
+        delta = max_time_between_candidates.value();
+    }
+    else
+    {
+        throw std::invalid_argument("FastMapMatch: Unknown transition mode");
+    }
+    if (!network_.is_finalized())
+    {
+        throw std::invalid_argument("FastMapMatch: Network must be finalized (call build_rtree_index() first)");
+    }
+    if (network_.get_edge_count() == 0)
+    {
+        throw std::invalid_argument("FastMapMatch: Network contains no edges");
+    }
+
+    // Create cache directory
+    std::filesystem::path cache_path(cache_dir);
+    std::filesystem::create_directories(cache_path);
+
+    // Compute network hash for cache validation
+    std::string network_hash = network_.compute_hash();
+
+    // Generate cache filename based on network hash, mode, and delta
+    std::ostringstream filename;
+    filename << "ubodt_" << network_hash << "_"
+             << (mode == TransitionMode::SHORTEST ? "shortest" : "fastest")
+             << "_delta" << std::fixed << std::setprecision(1) << delta << ".bin";
+    std::filesystem::path ubodt_path = cache_path / filename.str();
+
+    SPDLOG_INFO("FastMapMatch: mode={}, delta={}, cache={}",
+                (mode == TransitionMode::SHORTEST ? "SHORTEST" : "FASTEST"),
+                delta, ubodt_path.string());
+
+    // Generate or load UBODT
+    if (!std::filesystem::exists(ubodt_path))
+    {
+        SPDLOG_INFO("Generating UBODT and saving to {}", ubodt_path.string());
+        SPDLOG_INFO("This may take a while for large networks...");
+
+        UBODTGenAlgorithm ubodt_gen(network_, graph_, mode);
+        ubodt_gen.generate_ubodt(ubodt_path.string(), delta, network_hash);
+    }
+    else
+    {
+        SPDLOG_INFO("Found cached UBODT at {}", ubodt_path.string());
+    }
+
+    // Load UBODT and validate
+    SPDLOG_INFO("Loading UBODT from {}", ubodt_path.string());
+    ubodt_ = UBODT::read_ubodt(ubodt_path.string());
+
+    // Verify loaded UBODT metadata
+    std::string loaded_hash = ubodt_->get_network_hash();
+    TransitionMode loaded_mode = ubodt_->get_mode();
+    double loaded_delta = ubodt_->get_delta();
+    int loaded_num_vertices = ubodt_->get_num_vertices();
+    long long loaded_num_rows = ubodt_->get_num_rows();
+
+    SPDLOG_INFO("Loaded UBODT: hash={}, mode={}, delta={} with {} vertices",
+                loaded_hash,
+                (loaded_mode == TransitionMode::SHORTEST ? "SHORTEST" : "FASTEST"),
+                loaded_delta,
+                loaded_num_vertices);
+
+    // Validate num vertices:
+    if (loaded_num_rows == 0 || loaded_num_vertices == 0)
+    {
+        throw std::runtime_error("Loaded UBODT is empty!");
+    }
+    if (loaded_num_vertices < network_.get_node_count())
+    {
+        throw std::runtime_error("Loaded UBODT has fewer vertices than network nodes!");
+    }
+
+    // Validate mode
+    if (loaded_mode != mode)
+    {
+        throw std::runtime_error(
+            "UBODT mode mismatch! Expected " +
+            std::string(mode == TransitionMode::SHORTEST ? "SHORTEST" : "FASTEST") +
+            " but UBODT was generated with " +
+            std::string(loaded_mode == TransitionMode::SHORTEST ? "SHORTEST" : "FASTEST") +
+            ". Please delete " + ubodt_path.string() + " to regenerate.");
+    }
+
+    // Validate network hash
+    if (loaded_hash.empty() || loaded_hash != network_hash)
+    {
+        throw std::runtime_error(
+            "UBODT network hash mismatch! Expected " + network_hash +
+            " but UBODT has " + loaded_hash +
+            ". The network has changed. Please delete " + ubodt_path.string() + " to regenerate.");
+    }
+
+    // Validate delta:
+    if (std::abs(loaded_delta - delta) > 1e-6)
+    {
+        throw std::runtime_error(
+            "UBODT delta mismatch! Expected " + std::to_string(delta) +
+            " but UBODT has " + std::to_string(loaded_delta) +
+            ". Please delete " + ubodt_path.string() + " to regenerate.");
+    }
+
+    SPDLOG_INFO("FastMapMatch initialized successfully.");
+}
 
 FastMapMatchConfig::FastMapMatchConfig(int k_arg,
                                        double candidate_search_radius,
@@ -268,7 +402,7 @@ double FastMapMatch::get_distance(const Candidate *ca, const Candidate *cb, doub
     }
     else
     {
-        Record *r = ubodt_->look_up(ca->edge->target, cb->edge->source);
+        const Record *r = ubodt_->look_up(ca->edge->target, cb->edge->source);
         // No sp path exist from O to D.
         if (r == nullptr)
             return std::numeric_limits<double>::infinity();
@@ -306,7 +440,7 @@ double FastMapMatch::get_time(const Candidate *ca, const Candidate *cb, double r
     }
     else
     {
-        Record *r = ubodt_->look_up(ca->edge->target, cb->edge->source);
+        const Record *r = ubodt_->look_up(ca->edge->target, cb->edge->source);
         if (r == nullptr)
             return std::numeric_limits<double>::infinity();
 

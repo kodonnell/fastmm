@@ -22,6 +22,15 @@ namespace FASTMM
   {
 
     /**
+     * Routing mode for map matching
+     */
+    enum class TransitionMode
+    {
+      SHORTEST, /**< Distance-based routing */
+      FASTEST   /**< Time-based routing */
+    };
+
+    /**
      * Error codes for map matching results
      */
     enum class MatchErrorCode : int
@@ -149,9 +158,8 @@ namespace FASTMM
       int id;                                       /**< id of the trajectory */
       std::vector<PySubTrajectory> subtrajectories; /**< List of sub-trajectory matches (both successful and failed) */
     };
-
   };
 
 };
 
-#endif // FASTMM_INCLUDE_FASTMM_FASTMM_RESULT_HPP_
+#endif

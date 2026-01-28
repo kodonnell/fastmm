@@ -51,11 +51,11 @@ namespace FASTMM
     {
       EdgeIndex index;               /**< Index of an edge, which is continuous [0,N-1] */
       EdgeID id;                     /**< Edge ID, can be discontinuous integers */
-      NodeIndex source;              /**< source node index */
-      NodeIndex target;              /**< target node index */
-      double length;                 /**< length of the edge polyline */
-      std::optional<double> speed;   /**< speed limit on the edge (optional) */
-      FASTMM::CORE::LineString geom; /**< the edge geometry */
+      NodeIndex source;              /**< Source node index */
+      NodeIndex target;              /**< Target node index */
+      double length;                 /**< Length of the edge polyline */
+      std::optional<double> speed;   /**< Speed limit on the edge (optional) */
+      FASTMM::CORE::LineString geom; /**< The edge geometry */
     };
 
   } // NETWORK

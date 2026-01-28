@@ -12,6 +12,7 @@
 
 #include "network/network.hpp"
 #include "network/network_graph.hpp"
+#include "mm/fmm/fmm_algorithm.hpp"
 
 #ifdef BOOST_OS_WINDOWS
 #include <boost/throw_exception.hpp>
@@ -26,15 +27,17 @@ namespace FASTMM
     {
     public:
       UBODTGenAlgorithm(const NETWORK::Network &network,
-                        const NETWORK::NetworkGraph &graph) : network_(network), ng_(graph) {
-                                                              };
-      void generate_ubodt(const std::string &filename, double delta) const;
+                        const NETWORK::NetworkGraph &graph,
+                        TransitionMode mode) : network_(network), ng_(graph), mode_(mode) {
+                                               };
+      void generate_ubodt(const std::string &filename, double delta, const std::string &network_hash = "") const;
       /**
        * Run precomputation in parallel and save result to a file
        * @param filename output file name
        * @param delta    upper bound value
+       * @param network_hash hash of the network structure
        */
-      void precompute_ubodt_omp(const std::string &filename, double delta) const;
+      void precompute_ubodt_omp(const std::string &filename, double delta, const std::string &network_hash) const;
 
     private:
       /**
@@ -51,6 +54,7 @@ namespace FASTMM
 
       const NETWORK::Network &network_;
       const NETWORK::NetworkGraph &ng_;
+      const TransitionMode mode_;
     }; // UBODTGenAlgorithm
   }; // MM
 }; // FASTMM

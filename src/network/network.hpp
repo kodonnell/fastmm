@@ -68,6 +68,7 @@ namespace FASTMM
        * @return number of edges
        */
       int get_edge_count() const;
+      bool is_finalized() const;
       const Edge &get_edge(EdgeID id) const;
       const Edge &get_edge(EdgeIndex index) const;
       /**
@@ -193,6 +194,13 @@ namespace FASTMM
        */
       void build_rtree_index();
 
+      /**
+       * Compute a hash of the network structure for cache validation
+       *
+       * @return 32-character hex hash string
+       */
+      std::string compute_hash() const;
+
     private:
       /**
        * Concatenate a linestring segs to a linestring line, used in the
@@ -207,13 +215,14 @@ namespace FASTMM
                                       int offset = 0);
       Rtree rtree;              // Network rtree structure
       bool rtree_built = false; // Flag to track if rtree has been built
+      bool finalized = false;   // Flag to prevent modifications after finalization
       std::vector<Edge> edges;  // all edges in the network
       NodeIDVec node_id_vec;
       unsigned int num_vertices;
       NodeIndexMap node_map;
       EdgeIndexMap edge_map;
       std::vector<FASTMM::CORE::Point> vertex_points;
-    }; // Network
-  } // NETWORK
-} // FASTMM
-#endif /* FASTMM_NETWORK_HPP */
+    };
+  }
+}
+#endif
