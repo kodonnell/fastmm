@@ -243,30 +243,6 @@ PYBIND11_MODULE(fastmm, m)
                       ") to (" + fmt::format("{:.1f}", s.p1.x) + ", " + fmt::format("{:.1f}", s.p1.y) + ", " + fmt::format("{:.1f}", s.p1.t) +
                       ") with " + std::to_string(s.edges.size()) + " edges>"; });
 
-    // PyMatchResult struct
-    py::class_<PyMatchResult>(m, "MatchResult", R"pbdoc(
-        Complete map matching result for a trajectory.
-
-        Contains the matched path as a sequence of segments, error information,
-        and metadata about which trajectory points were successfully matched.
-    )pbdoc")
-        .def_readonly("id", &PyMatchResult::id,
-                      "Trajectory ID (copied from input Trajectory)")
-        .def_readonly("error_code", &PyMatchResult::error_code,
-                      "MatchErrorCode indicating success or failure reason")
-        .def_readonly("last_connected_trajectory_point", &PyMatchResult::last_connected_trajectory_point,
-                      "Index of the last GPS point that was successfully matched in a connected path")
-        .def_readonly("unmatched_candidate_indices", &PyMatchResult::unmatched_candidate_indices,
-                      "List of trajectory point indices that could not be matched (e.g., too far from network)")
-        .def_readonly("segments", &PyMatchResult::segments,
-                      "List of MatchSegment objects forming the complete matched path")
-        .def("__repr__", [](const PyMatchResult &r)
-             { return "<Match id=" + std::to_string(r.id) +
-                      " error_code=" + std::to_string(static_cast<int>(r.error_code)) +
-                      " last_connected_trajectory_point=" + std::to_string(r.last_connected_trajectory_point) +
-                      " number unmatched candidates=" + std::to_string(r.unmatched_candidate_indices.size()) +
-                      " with " + std::to_string(r.segments.size()) + " segments>"; });
-
     // SubTrajectory struct
     py::class_<PySubTrajectory>(m, "SubTrajectory", R"pbdoc(
         A continuous portion of a trajectory that was matched or failed.

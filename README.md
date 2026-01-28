@@ -85,9 +85,9 @@ matcher = fastmm.MapMatcher(
 ## TODO
 
 - tidy readme
+- currently if a point from GPS trace fails (too far etc.) it's excluded from match. Should add it to match just with start == end and appropriate error code.
 - xyt if no t provided has t = 0, when probably should be null.
 - test the time apportioning.
-- unused
 - If not found in UBODT, instead of bailing, do a normal djikstra lookup.
 - max_distance_between_candidates is not a hard limit in UBODT ... I think. Test this, and if needed, add an extra check.
 - Specify versions for build libs (e.g. cibuildwheel).

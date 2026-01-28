@@ -197,7 +197,6 @@ MatchResult FastMapMatch::match_trajectory(const Trajectory &trajectory, const F
     {
         SPDLOG_DEBUG("No candidates found for trajectory {} at points {}", trajectory.id, unmatched_indices);
         result.error_code = MatchErrorCode::CANDIDATES_NOT_FOUND;
-        result.unmatched_candidate_indices = unmatched_indices;
         return result;
     }
 
@@ -210,7 +209,6 @@ MatchResult FastMapMatch::match_trajectory(const Trajectory &trajectory, const F
     if (!all_connected)
     {
         SPDLOG_DEBUG("Traj {} unmatched at trajectory point {}", trajectory.id, last_connected);
-        result.last_connected_trajectory_point = last_connected;
         result.error_code = MatchErrorCode::DISCONNECTED_LAYERS;
         return result;
     }

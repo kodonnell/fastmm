@@ -208,8 +208,6 @@ class TestShortestVsFastest:
                 all_edges.append(edge.edge_id)
                 print(edge.points)
 
-        assert False
-
         # Remove consecutive duplicates
         route = []
         for edge_id in all_edges:

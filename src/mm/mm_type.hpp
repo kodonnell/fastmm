@@ -87,15 +87,13 @@ namespace FASTMM
      */
     struct MatchResult
     {
-      int id;                                       /**< id of the trajectory to be matched */
-      MatchedCandidatePath opt_candidate_path;      /**< A vector of candidate matched to each point of a trajectory. It is stored in order to export more detailed map matching information. */
-      OptimalPath optimal_path;                     /**< the optimal path, containing id of edges matched to each point in a trajectory */
-      CompletePath complete_path;                   /**< the complete path, containing ids of a sequence of topologically connected edges traversed by the trajectory.  */
-      std::vector<int> indices;                     /**< index of optimal_path edge in complete_path */
-      CORE::LineString matched_geometry;            /**< the geometry of the matched path */
-      MatchErrorCode error_code;                    /**< error code if the map matching failed */
-      int last_connected_trajectory_point;          /**< the index of the last connected layer */
-      std::vector<int> unmatched_candidate_indices; /**< the indices of the unmatched trajectory points if no candidates found */
+      int id;                                  /**< id of the trajectory to be matched */
+      MatchedCandidatePath opt_candidate_path; /**< A vector of candidate matched to each point of a trajectory. It is stored in order to export more detailed map matching information. */
+      OptimalPath optimal_path;                /**< the optimal path, containing id of edges matched to each point in a trajectory */
+      CompletePath complete_path;              /**< the complete path, containing ids of a sequence of topologically connected edges traversed by the trajectory.  */
+      std::vector<int> indices;                /**< index of optimal_path edge in complete_path */
+      CORE::LineString matched_geometry;       /**< the geometry of the matched path */
+      MatchErrorCode error_code;               /**< error code if the map matching failed */
     };
 
     struct PyMatchPoint
@@ -129,18 +127,6 @@ namespace FASTMM
       PyMatchCandidate p0;
       PyMatchCandidate p1;
       std::vector<PyMatchSegmentEdge> edges;
-    };
-
-    /**
-     * Py map matched result representation
-     */
-    struct PyMatchResult
-    {
-      int id;                                       /**< id of the trajectory to be matched */
-      MatchErrorCode error_code;                    /**< error code if the map matching failed */
-      int last_connected_trajectory_point;          /**< the index of the last connected layer */
-      std::vector<int> unmatched_candidate_indices; /**< the indices of the unmatched trajectory points if no candidates found */
-      std::vector<PyMatchSegment> segments;         /**< A vector of matched segments */
     };
 
     /**

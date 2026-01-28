@@ -21,7 +21,6 @@ __all__ = [
     "Point",
     "LineString",
     # Result classes
-    "MatchResult",
     "MatchSegment",
     "MatchCandidate",
     "MatchPoint",
