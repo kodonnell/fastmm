@@ -196,8 +196,7 @@ namespace FASTMM
       static constexpr double DOUBLE_MIN = 1.e-6;
       const Network &network;        /**< Road network */
       unsigned int num_vertices = 0; /**< number of vertices  */
-    }; // NetworkGraph
-
-  }; // NETWORK
-} // FASTMM
-#endif /* FASTMM_NETWORK_GRAPH_HPP */
+    };
+  };
+}
+#endif

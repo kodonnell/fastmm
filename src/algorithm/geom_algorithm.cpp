@@ -389,6 +389,13 @@ void FASTMM::ALGORITHM::locate_point_by_offset(
 FASTMM::CORE::LineString FASTMM::ALGORITHM::cutoffseg_unique(
     const FASTMM::CORE::LineString &linestring, double offset1, double offset2)
 {
+  // If offset1 > offset2, swap them and reverse the result at the end
+  bool needs_reversal = (offset1 > offset2);
+  if (needs_reversal)
+  {
+    std::swap(offset1, offset2);
+  }
+
   FASTMM::CORE::LineString cutoffline;
   int Npoints = linestring.get_num_points();
   if (Npoints == 2)
@@ -454,6 +461,13 @@ FASTMM::CORE::LineString FASTMM::ALGORITHM::cutoffseg_unique(
       ++i;
     }
   }
+
+  // Reverse if offsets were swapped
+  if (needs_reversal)
+  {
+    boost::geometry::reverse(cutoffline.get_geometry());
+  }
+
   return cutoffline;
 } // cutoffseg_twoparameters
 

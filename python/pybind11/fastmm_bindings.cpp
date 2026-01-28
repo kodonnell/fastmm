@@ -249,8 +249,10 @@ PYBIND11_MODULE(fastmm, m)
                       "ID of the matched road edge from the network")
         .def_readonly("points", &PyMatchSegmentEdge::points,
                       "List of PyMatchPoint objects along this edge, ordered by position")
+        .def_readonly("reversed", &PyMatchSegmentEdge::reversed,
+                      "True if geometry is reversed (GPS moved backward on same edge due to reverse_tolerance)")
         .def("__repr__", [](const PyMatchSegmentEdge &e)
-             { return "<Edge edge_id=" + std::to_string(e.edge_id) + " with " + std::to_string(e.points.size()) + " points>"; });
+             { return "<Edge edge_id=" + std::to_string(e.edge_id) + " with " + std::to_string(e.points.size()) + " points" + (e.reversed ? " (reversed)" : "") + ">"; });
 
     // PyMatchCandidate struct
     py::class_<PyMatchCandidate>(m, "PyMatchCandidate", R"pbdoc(

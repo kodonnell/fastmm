@@ -22,7 +22,7 @@ FastMapMatch::FastMapMatch(const Network &network,
                            std::optional<double> max_distance_between_candidates,
                            std::optional<double> max_time_between_candidates,
                            const std::string &cache_dir)
-    : network_(network), graph_(network, mode), ubodt_(nullptr)
+    : network_(network), graph_(network, mode), ubodt_(nullptr), mode_(mode)
 {
     // Validate inputs
     double delta = 0.0;
@@ -53,14 +53,6 @@ FastMapMatch::FastMapMatch(const Network &network,
     if (network_.get_edge_count() == 0)
     {
         throw std::invalid_argument("FastMapMatch: Network contains no edges");
-    }
-    if (network_.get_mode() != mode)
-    {
-        throw std::invalid_argument("FastMapMatch: Network mode does not match FastMapMatch mode");
-    }
-    if (graph_.get_mode() != mode)
-    {
-        throw std::invalid_argument("FastMapMatch: NetworkGraph mode does not match FastMapMatch mode");
     }
 
     // Create cache directory
@@ -180,7 +172,7 @@ FastMapMatchConfig::FastMapMatchConfig(int k_arg,
 
 MatchResult FastMapMatch::match_trajectory(const Trajectory &trajectory, const FastMapMatchConfig &config)
 {
-    if (config.transition_mode != network_.get_mode() || config.transition_mode != ubodt_->get_mode() || config.transition_mode != graph_.get_mode())
+    if (config.transition_mode != ubodt_->get_mode() || config.transition_mode != mode_)
     {
         throw std::invalid_argument("FastMapMatch::match_trajectory: Transition mode in config does not match FastMapMatch mode");
     }
@@ -313,6 +305,7 @@ PyMatchResult FastMapMatch::pymatch_trajectory(const CORE::Trajectory &trajector
             const Edge &e0 = network_.get_edge(edge_id);
             start_offset = mc0.c.offset;
             end_offset = mc1.c.offset;
+            bool is_reversed = (start_offset > end_offset);
             line = ALGORITHM::cutoffseg_unique(e0.geom, start_offset, end_offset);
             points.clear();
             distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
@@ -325,7 +318,7 @@ PyMatchResult FastMapMatch::pymatch_trajectory(const CORE::Trajectory &trajector
                 }
                 points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
             }
-            const PyMatchSegmentEdge segmentEdge = {edge_id, points};
+            const PyMatchSegmentEdge segmentEdge = {edge_id, points, is_reversed};
             segment.edges.push_back(segmentEdge);
         }
         else
@@ -348,7 +341,7 @@ PyMatchResult FastMapMatch::pymatch_trajectory(const CORE::Trajectory &trajector
                 }
                 points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
             }
-            segment.edges.push_back({edge_id, points});
+            segment.edges.push_back({edge_id, points, false});
 
             // Next, all the full edges in between:
             for (int j = start_edge_index + 1; j < end_edge_index; ++j)
@@ -366,7 +359,7 @@ PyMatchResult FastMapMatch::pymatch_trajectory(const CORE::Trajectory &trajector
                     }
                     points.push_back({line.get_x(k), line.get_y(k), cumulative_distance - start_distance, cumulative_distance});
                 }
-                segment.edges.push_back({edge_id, points});
+                segment.edges.push_back({edge_id, points, false});
             }
             // Finally, the segment from the start of the last edge to the end point:
             edge_id = result.complete_path[end_edge_index];
@@ -385,7 +378,7 @@ PyMatchResult FastMapMatch::pymatch_trajectory(const CORE::Trajectory &trajector
                 }
                 points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
             }
-            segment.edges.push_back({edge_id, points});
+            segment.edges.push_back({edge_id, points, false});
         }
 
         // Done!
@@ -403,7 +396,7 @@ double FastMapMatch::get_distance(const Candidate *ca, const Candidate *cb, doub
         // Transition on the same edge, where b is after a i.e. not reversing.
         distance = cb->offset - ca->offset;
     }
-    else if (ca->edge->id == cb->edge->id && ca->offset - cb->offset < ca->edge->length * reverse_tolerance)
+    else if (ca->edge->id == cb->edge->id && ca->offset - cb->offset < reverse_tolerance)
     {
         // Transition on the same edge, where b is before a but also within the reverse tolerance, then allow.
         distance = 0;
@@ -435,7 +428,7 @@ double FastMapMatch::get_time(const Candidate *ca, const Candidate *cb, double r
         double segment_distance = cb->offset - ca->offset;
         time = segment_distance / ca->edge->speed.value();
     }
-    else if (ca->edge->id == cb->edge->id && ca->offset - cb->offset < ca->edge->length * reverse_tolerance)
+    else if (ca->edge->id == cb->edge->id && ca->offset - cb->offset < reverse_tolerance)
     {
         // Reverse within tolerance
         time = 0;
@@ -790,6 +783,7 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
             // Single edge
             EdgeID edge_id = complete_path[start_edge_index];
             const Edge &e0 = network_.get_edge(edge_id);
+            bool is_reversed = (mc0.c.offset > mc1.c.offset);
             FASTMM::CORE::LineString line = ALGORITHM::cutoffseg_unique(e0.geom, mc0.c.offset, mc1.c.offset);
             std::vector<double> distances = ALGORITHM::calculate_linestring_euclidean_distances(line);
             std::vector<PyMatchPoint> points;
@@ -801,7 +795,7 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
                     cumulative_distance += distances[j - 1];
                 points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
             }
-            segment.edges.push_back({edge_id, points});
+            segment.edges.push_back({edge_id, points, is_reversed});
         }
         else
         {
@@ -819,7 +813,7 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
                     cumulative_distance += distances[j - 1];
                 points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
             }
-            segment.edges.push_back({edge_id, points});
+            segment.edges.push_back({edge_id, points, false});
 
             // Middle edges
             for (int j = start_edge_index + 1; j < end_edge_index; ++j)
@@ -836,7 +830,7 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
                         cumulative_distance += distances[k - 1];
                     points.push_back({line.get_x(k), line.get_y(k), cumulative_distance - start_distance, cumulative_distance});
                 }
-                segment.edges.push_back({edge_id, points});
+                segment.edges.push_back({edge_id, points, false});
             }
 
             // Last edge
@@ -853,7 +847,7 @@ std::vector<PyMatchSegment> FastMapMatch::build_py_segments(const MatchedCandida
                     cumulative_distance += distances[j - 1];
                 points.push_back({line.get_x(j), line.get_y(j), cumulative_distance - start_distance, cumulative_distance});
             }
-            segment.edges.push_back({edge_id, points});
+            segment.edges.push_back({edge_id, points, false});
         }
 
         segments.push_back(segment);

@@ -516,6 +516,151 @@ class TestSplitMatching:
             )
 
 
+class TestReversedGeometry:
+    """Test handling of reversed geometry when GPS moves backward on same edge."""
+
+    def test_fails_to_reverse_if_outside_tolerance(self):
+        """Reverse tolerance of e.g. 10 units only allows reversing 10 units of edge length, so if reverse is 50
+        units, it should fail."""
+        network = fastmm.Network()
+        # Create a simple straight road
+        network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
+        network.finalize()
+
+        matcher = fastmm.FastMapMatch(
+            network,
+            fastmm.TransitionMode.SHORTEST,
+            max_distance_between_candidates=1000,
+            cache_dir=".cache/test_reversed",
+        )
+
+        # Allow reverse tolerance for backward movement
+        config = fastmm.FastMapMatchConfig(
+            k=4,
+            candidate_search_radius=50,
+            gps_error=50,
+            reverse_tolerance=10,  # Allow 10 units backward movement
+        )
+
+        # GPS points that move backward: 80m -> 30m on same edge
+        trajectory = fastmm.Trajectory.from_xy_tuples(1, [(80, 0), (30, 0)])
+
+        result = matcher.pymatch_trajectory(trajectory, config)
+        assert result.error_code == fastmm.MatchErrorCode.DISCONNECTED_LAYERS
+
+    def test_reversed_flag_on_backward_movement(self):
+        """Test that reversed flag is set when GPS moves backward on same edge."""
+        network = fastmm.Network()
+        # Create a simple straight road
+        network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
+        network.finalize()
+
+        matcher = fastmm.FastMapMatch(
+            network,
+            fastmm.TransitionMode.SHORTEST,
+            max_distance_between_candidates=1000,
+            cache_dir=".cache/test_reversed",
+        )
+
+        # Allow reverse tolerance for backward movement
+        config = fastmm.FastMapMatchConfig(
+            k=4,
+            candidate_search_radius=50,
+            gps_error=50,
+            reverse_tolerance=60,  # Allow 60m backward movement
+        )
+
+        # GPS points that move backward: 80m -> 30m on same edge
+        trajectory = fastmm.Trajectory.from_xy_tuples(1, [(80, 0), (30, 0)])
+
+        result = matcher.pymatch_trajectory(trajectory, config)
+        assert result.error_code == fastmm.MatchErrorCode.SUCCESS
+
+        # Should have one segment with one edge
+        assert len(result.segments) == 1
+        segment = result.segments[0]
+        assert len(segment.edges) == 1
+        edge = segment.edges[0]
+
+        # The reversed flag should be set
+        assert hasattr(edge, "reversed"), "Edge should have 'reversed' attribute"
+        assert edge.reversed is True, "Edge should be marked as reversed"
+
+        # Geometry should still go forward (from 30 to 80) after auto-correction
+        # First point should be at lower offset, last at higher offset
+        assert len(edge.points) >= 2
+        # The edge_offset should increase from first to last point
+        assert edge.points[0].edge_offset < edge.points[-1].edge_offset, (
+            "Geometry should be corrected to go forward even when reversed"
+        )
+
+        print(f"\nReversed edge test: edge_id={edge.edge_id}, reversed={edge.reversed}")
+        print(f"  First point offset: {edge.points[0].edge_offset:.1f}")
+        print(f"  Last point offset: {edge.points[-1].edge_offset:.1f}")
+
+    def test_not_reversed_on_forward_movement(self):
+        """Test that reversed flag is False for normal forward movement."""
+        network = fastmm.Network()
+        network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)], speed=50)
+        network.finalize()
+
+        matcher = fastmm.FastMapMatch(
+            network,
+            fastmm.TransitionMode.SHORTEST,
+            max_distance_between_candidates=1000,
+            cache_dir=".cache/test_not_reversed",
+        )
+        config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=50, gps_error=50)
+
+        # Normal forward movement: 30m -> 80m
+        trajectory = fastmm.Trajectory.from_xy_tuples(1, [(30, 0), (80, 0)])
+
+        result = matcher.pymatch_trajectory(trajectory, config)
+        assert result.error_code == fastmm.MatchErrorCode.SUCCESS
+
+        segment = result.segments[0]
+        edge = segment.edges[0]
+
+        # Should NOT be marked as reversed
+        assert edge.reversed is False, "Forward movement should not be marked as reversed"
+
+        # Geometry should go forward
+        assert edge.points[0].edge_offset < edge.points[-1].edge_offset
+
+    def test_reversed_geometry_consistency(self):
+        """Test that reversed geometry maintains spatial consistency."""
+        network = fastmm.Network()
+        # Multi-segment linestring
+        network.add_edge(1, source=1, target=2, geom=[(0, 0), (50, 0), (100, 0)], speed=50)
+        network.finalize()
+
+        matcher = fastmm.FastMapMatch(
+            network,
+            fastmm.TransitionMode.SHORTEST,
+            max_distance_between_candidates=1000,
+            cache_dir=".cache/test_reversed_consistency",
+        )
+        config = fastmm.FastMapMatchConfig(k=4, candidate_search_radius=50, gps_error=50, reverse_tolerance=60)
+
+        # Backward movement on multi-segment edge
+        trajectory = fastmm.Trajectory.from_xy_tuples(1, [(90, 0), (40, 0)])
+
+        result = matcher.pymatch_trajectory(trajectory, config)
+        assert result.error_code == fastmm.MatchErrorCode.SUCCESS
+
+        edge = result.segments[0].edges[0]
+        assert edge.reversed is True
+
+        # Points should form a valid path with increasing offsets
+        for i in range(len(edge.points) - 1):
+            assert edge.points[i].edge_offset <= edge.points[i + 1].edge_offset, (
+                f"Point {i} offset {edge.points[i].edge_offset} should be <= point {i + 1} offset {edge.points[i + 1].edge_offset}"
+            )
+
+        print(f"\nMulti-segment reversed edge: {len(edge.points)} points")
+        print(f"  Offset range: {edge.points[0].edge_offset:.1f} to {edge.points[-1].edge_offset:.1f}")
+
+
 if __name__ == "__main__":
     # Allow running without pytest
     print("Running tests...")

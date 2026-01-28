@@ -110,6 +110,7 @@ namespace FASTMM
     {
       long long edge_id;
       std::vector<PyMatchPoint> points;
+      bool reversed;  // True if geometry is reversed (offset1 > offset2 on same edge)
     };
 
     struct PyMatchCandidate

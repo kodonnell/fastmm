@@ -76,6 +76,7 @@ namespace FASTMM
        * @param path an optimal path
        * @param edges a vector of edges
        * @param indices the index of each optimal edge in the complete path
+       * @param reverse_tolerance reverse tolerance parameter (in map units)
        * @return a complete path (topologically connected).
        * If there is a large gap in the optimal
        * path implying complete path cannot be found in UBDOT,

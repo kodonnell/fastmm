@@ -35,7 +35,7 @@ namespace FASTMM
        * @param candidate_search_radius the search radius, in map unit, which is the same as
        * GPS data and network data.
        * @param gps_error the gps error, in map unit
-       * @param reverse_tolerance reverse tolerance
+       * @param reverse_tolerance reverse tolerance, in map unit
        * @param transition_mode routing mode (SHORTEST or FASTEST)
        * @param reference_speed reference speed for FASTEST mode (required if mode is FASTEST)
        */
@@ -46,9 +46,9 @@ namespace FASTMM
                          TransitionMode transition_mode = TransitionMode::SHORTEST,
                          std::optional<double> reference_speed = std::nullopt);
       int k;                                 /**< Number of candidates */
-      double candidate_search_radius;        /**< Search radius*/
-      double gps_error;                      /**< GPS error */
-      double reverse_tolerance;              /**< Reverse tolerance */
+      double candidate_search_radius;        /**< Search radius, in map unit*/
+      double gps_error;                      /**< GPS error, in map unit */
+      double reverse_tolerance;              /**< Reverse tolerance, in map unit */
       TransitionMode transition_mode;        /**< Routing mode */
       std::optional<double> reference_speed; /**< Reference speed for FASTEST mode */
     };
@@ -106,7 +106,7 @@ namespace FASTMM
        * Get path distance between two candidates (always distance, regardless of mode)
        * @param  ca from candidate
        * @param  cb to candidate
-       * @param  reverse_tolerance reverse tolerance parameter
+       * @param  reverse_tolerance reverse tolerance parameter (in map units)
        * @return  path distance
        */
       double get_distance(const Candidate *ca,
@@ -117,7 +117,7 @@ namespace FASTMM
        * Get path time between two candidates (distance/speed for each segment)
        * @param  ca from candidate
        * @param  cb to candidate
-       * @param  reverse_tolerance reverse tolerance parameter
+       * @param  reverse_tolerance reverse tolerance parameter (in map units)
        * @return  path time
        */
       double get_time(const Candidate *ca,
@@ -169,8 +169,9 @@ namespace FASTMM
       const NETWORK::Network &network_;
       NETWORK::NetworkGraph graph_;
       std::shared_ptr<UBODT> ubodt_;
+      TransitionMode mode_;
     };
   }
 }
 
-#endif // FASTMM_FASTMM_ALGORITHM_H_
+#endif

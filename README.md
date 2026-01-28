@@ -82,53 +82,12 @@ matcher = fastmm.MapMatcher(
 # The rest is the same...
 ```
 
-**MapMatcher benefits:**
-- ✅ Automatic UBODT generation and caching
-- ✅ Network hash-based cache invalidation (regenerates if network changes)
-- ✅ Mode validation (prevents using SHORTEST UBODT with FASTEST graph)
-- ✅ Auto-computed multiplier (no manual tuning needed)
-- ✅ Clear parameter names based on mode
 
-## Advanced Usage (Low-Level API)
+## TODO
 
-If you need fine control over UBODT generation, you can use the low-level API:
-
-```python
-import fastmm
-
-# Create network
-network = fastmm.Network()
-network.add_edge(1, source=1, target=2, geom=[(0, 0), (100, 0)])
-network.add_edge(2, source=2, target=3, geom=[(100, 0), (200, 0)])
-network.finalize()
-
-# Build routing graph and UBODT manually
-mode = fastmm.TransitionMode.SHORTEST
-graph = fastmm.NetworkGraph(network, mode)
-ubodt_gen = fastmm.UBODTGenAlgorithm(network, graph, mode)
-ubodt_gen.generate_ubodt("ubodt.bin", delta=1000)  # delta in meters for SHORTEST
-
-# Load UBODT with mode validation
-ubodt = fastmm.UBODT.read_ubodt_binary(
-    "ubodt.bin",
-    multiplier=-1,  # -1 = auto from file (recommended)
-    expected_mode=int(mode)  # validates mode matches
-)
-
-# Create matcher and config
-matcher = fastmm.FastMapMatch(network, graph, ubodt)
-config = fastmm.FastMapMatchConfig(k=8, candidate_search_radius=50, gps_error=50)
-
-# Match a trajectory
-trajectory = fastmm.Trajectory.from_xy_tuples(1, [(10, 0), (50, 0), (150, 0)])
-result = matcher.pymatch_trajectory(trajectory, config)
-
-if result.error_code == fastmm.MatchErrorCode.SUCCESS:
-    for segment in result.segments:
-        print(f"Segment from {segment.p0} to {segment.p1}")
-        for edge in segment.edges:
-            print(f"  Edge {edge.edge_id} with {len(edge.points)} points")
-```
+- If not found in UBODT, instead of bailing, do a normal djikstra lookup.
+- max_distance_between_candidates is not a hard limit in UBODT ... I think. Test this, and if needed, add an extra check.
+- Specify versions for build libs (e.g. cibuildwheel).
 
 ### Automatic Trajectory Splitting
 
@@ -182,11 +141,71 @@ The `delta` parameter (called `max_distance_between_candidates` or `max_time_bet
 - **Larger delta**: Better matching quality (more routing options), but larger file size and slower generation
 - **Smaller delta**: Faster generation and smaller files, but may fail to find paths between distant GPS points
 
-## TODO
+## Understanding Reverse Tolerance
 
-- If not found in UBODT, instead of bailing, do a normal djikstra lookup.
-- Need to check reverse tolerance - on our edges, they're all directed, so we probably shouldn't allow reversing. This causes errors when we're parsing - if you reverse on the same edge, the geometry gets flipped (I think - line = ALGORITHM::cutoffseg_unique(e0.geom, start_offset, end_offset); goes backward?), which then messes with our python post-processing of associating time as the segment start/stop are now the edge stop/start, not the other way round. We could add a reversed flag to the edge? That would help. For now, just don't have a reverse tolerance.
-- Specify versions for build libs (e.g. cibuildwheel).
+The `reverse_tolerance` parameter handles GPS measurement noise that causes slight backward movement on the **same edge**. This is different from edge direction:
+
+### How It Works
+
+**Edge Traversal:** The graph uses **directed edges**. Dijkstra routing always respects edge direction (source → target). For OSM data with bidirectional roads, you should have two edges (one per direction).
+
+**Same-Edge Positioning:** When two consecutive GPS points match to the **same edge** with the second point having a lower offset than the first (backward movement), `reverse_tolerance` controls whether this is allowed:
+
+```python
+# Example: GPS noise causes apparent backward movement
+GPS Point 1 → Edge 1 at offset=80m (80% along A→B)
+GPS Point 2 → Edge 1 at offset=50m (50% along A→B)
+
+# Without reverse_tolerance (0.0):
+# - Transition has infinite cost → rejected
+# - Algorithm may match Point 2 to opposite-direction edge (creating fake U-turn)
+# - Or Point 2 gets skipped in split mode
+
+# With reverse_tolerance=40 (40m in these units):
+# - Backward movement = 80m - 50m = 30m
+# - 30m < 40m ✅ Allowed with cost=0
+```
+
+### The Reversed Flag
+
+When backward movement is allowed (within tolerance), the `reversed` flag indicates this occurred. **The geometry is automatically corrected** to always go forward (from lower to higher offset), so you don't need to handle backward linestrings:
+
+```python
+for segment in result.segments:
+    for edge in segment.edges:
+        if edge.reversed:
+            # Geometry has been auto-corrected to go forward
+            # But you know GPS moved backward on this edge
+            # May want to flag this for quality control
+            print(f"Edge {edge.edge_id} had backward GPS movement (now corrected)")
+
+        # All edges have forward geometry regardless of reversed flag
+        # edge.points always go from lower to higher offset
+        for point in edge.points:
+            print(f"  Offset: {point.edge_offset}, Position: ({point.x}, {point.y})")
+```
+
+**What the `reversed` flag means:**
+- `reversed=True`: GPS moved backward (offset1 > offset2), geometry was auto-corrected to go forward
+- `reversed=False`: GPS moved forward normally (offset1 <= offset2)
+
+**No special handling needed** - the geometry is always correct. Use the flag for:
+- Quality control (detecting erratic GPS behavior)
+- Statistics (counting backward movements)
+- Debugging (understanding matching behavior)
+```
+
+### Recommendations
+
+**For OSM Networks (bidirectional edges):**
+- Use `reverse_tolerance=0.0` (default) to avoid fake U-turns
+- GPS noise is better handled by `gps_error` and trajectory splitting
+- Real backward movement should match to the opposite-direction edge
+
+**For Stationary/Slow Vehicles:**
+- Consider `reverse_tolerance=20` (20m assuming in Euclidean system)  to handle GPS jitter
+- Check `edge.reversed` flag in Python to handle geometry correctly
+- May need post-processing to detect oscillating matches
 
 ## Routing Modes: SHORTEST vs FASTEST
 
@@ -321,73 +340,4 @@ With `reference_speed=60`:
 - Transition probability: min(1.67, 2.4) / max(1.67, 2.4) = 1.67/2.4 = **0.70** (lower - penalizes this path)
 
 **Rule of thumb**: Set `reference_speed` close to the average speed in your network. If matching is too "sticky" to routes (not handling shortcuts well), increase it. If matching is too loose (taking implausible shortcuts), decrease it.
-
-## UBODT File Format
-
-Starting from this version, UBODT files include metadata for validation and automatic configuration:
-
-**File Structure (v1):**
-```
-[Header]
-- version (int): File format version (currently 1)
-- mode (int): TransitionMode (0=SHORTEST, 1=FASTEST)
-- delta (double): Maximum routing cost used during generation
-- num_vertices (int): Number of vertices in the network
-- multiplier (int): Hash table multiplier for optimal lookups
-- network_hash (string): Hash of network structure for validation
-
-[Data]
-- Records: source, target, first_n, prev_n, next_e, cost (repeated)
-```
-
-**Benefits:**
-- **Automatic mode validation**: Prevents using SHORTEST UBODT with FASTEST graph
-- **Network change detection**: Hash mismatch triggers automatic regeneration
-- **Auto-computed multiplier**: No manual tuning needed when loading
-- **Cache invalidation**: `MapMatcher` uses network hash + mode + delta for cache filenames
-- **Backward compatibility**: Old format files (pre-v1) automatically detected and loaded without validation
-
-**File naming convention (MapMatcher):**
-```
-ubodt_{network_hash}_{mode}_delta{delta}.bin
-```
-- `network_hash`: 8-char hash of network structure (edges, nodes, speeds)
-- `mode`: "shortest" or "fastest"
-- `delta`: The delta value used
-
-Example: `ubodt_a3f52e1b_shortest_delta300.0.bin`
-
-**Regeneration triggers:**
-- Network structure changes (different hash)
-- Different routing mode
-- Different delta value
-
-**Reading and validating UBODT metadata (low-level API):**
-```python
-# Compute network hash
-network_hash = network.compute_hash()
-
-# Generate UBODT with hash embedded
-ubodt_gen.generate_ubodt("ubodt.bin", delta=1000, network_hash=network_hash)
-
-# Load UBODT (metadata is read automatically)
-ubodt = fastmm.UBODT.read_ubodt("ubodt.bin")
-
-# Check loaded metadata and validate manually if needed
-loaded_hash = ubodt.get_network_hash()
-loaded_mode = ubodt.get_mode()
-loaded_delta = ubodt.get_delta()
-
-print(f"UBODT hash: {loaded_hash}")
-print(f"UBODT mode: {loaded_mode}")  # -1=unknown, 0=SHORTEST, 1=FASTEST
-print(f"UBODT delta: {loaded_delta}")
-
-# Manual validation
-if loaded_hash != network_hash:
-    raise ValueError("Network has changed - UBODT needs regeneration")
-if loaded_mode != int(fastmm.TransitionMode.SHORTEST):
-    raise ValueError("UBODT mode mismatch")
-```
-
-**Note:** `MapMatcher` performs all validation automatically.
 
