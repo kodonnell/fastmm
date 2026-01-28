@@ -63,7 +63,7 @@ local_scheme = "no-local-version"
 
 [tool.cibuildwheel]
 # Build for Python 3.8-3.12
-build = "cp38-* cp39-* cp310-* cp311-* cp312-*"
+build = "cp310-* cp311-* cp312-*"
 skip = "*-win32 *-musllinux_* *-manylinux_i686"
 
 # Build verbosity
@@ -89,14 +89,14 @@ repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel} --add-path C:/vc
 
 [tool.cibuildwheel.linux]
 # Use manylinux_2_28 (AlmaLinux 8) instead of manylinux2014 (CentOS 7 EOL)
-before-build = "yum install -y boost-devel cmake"
+before-build = "yum install -y boost-devel cmake && pip install pybind11-stubgen"
 # Repair wheel to bundle external dependencies, exclude libfastmmlib.so which is already in the wheel
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} --exclude libfastmmlib.so"
 # Use newer manylinux image
 manylinux-x86_64-image = "manylinux_2_28"
 
 [tool.cibuildwheel.macos]
-before-build = "brew install boost cmake libomp"
+before-build = "brew install boost cmake libomp && pip install pybind11-stubgen"
 environment = { OpenMP_ROOT = "$(brew --prefix libomp)" }
 
 [tool.ruff]
