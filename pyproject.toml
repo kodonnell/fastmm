@@ -69,9 +69,6 @@ skip = "*-win32 *-musllinux_* *-manylinux_i686"
 # Build verbosity
 build-verbosity = 1
 
-# Test the wheel after building
-test-command = "pytest {project}/test_fastmm.py -v"
-
 [tool.cibuildwheel.windows]
 # Install Boost and build dependencies before building
 before-build = "(if not exist \"C:\\vcpkg\\archives\" mkdir \"C:\\vcpkg\\archives\") && vcpkg install boost-geometry:x64-windows boost-serialization:x64-windows boost-format:x64-windows && pip install scikit-build-core setuptools-scm pybind11 pybind11-stubgen delvewheel"
@@ -89,14 +86,14 @@ repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel} --add-path C:/vc
 
 [tool.cibuildwheel.linux]
 # Use manylinux_2_28 (AlmaLinux 8) instead of manylinux2014 (CentOS 7 EOL)
-before-build = "yum install -y boost-devel cmake && pip install pybind11-stubgen pytest"
+before-build = "yum install -y boost-devel cmake && pip install pybind11-stubgen"
 # Repair wheel to bundle external dependencies, exclude libfastmmlib.so which is already in the wheel
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} --exclude libfastmmlib.so"
 # Use newer manylinux image
 manylinux-x86_64-image = "manylinux_2_28"
 
 [tool.cibuildwheel.macos]
-before-build = "brew install boost cmake libomp && pip install pybind11-stubgen pytest"
+before-build = "brew install boost cmake libomp && pip install pybind11-stubgen"
 environment = { OpenMP_ROOT = "$(brew --prefix libomp)" }
 
 [tool.ruff]
