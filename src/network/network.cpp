@@ -411,24 +411,19 @@ std::string Network::compute_hash() const
   // Format first 16 bytes (128 bits) as 32 hex chars
   std::ostringstream oss;
   oss << std::hex << std::setfill('0');
-#if BOOST_VERSION < 108500 // Boost < 1.85.0 uses unsigned char[20]
-  unsigned char digest[20];
+#if BOOST_VERSION >= 108500
+  boost::uuids::detail::sha1::digest_type digest;
   sha1.get_digest(digest);
-
   // Format first 16 bytes → 32 hex chars
+  const unsigned char *bytes = reinterpret_cast<const unsigned char *>(digest);
   for (int i = 0; i < 16; ++i)
-  {
-    oss << std::setw(2) << static_cast<unsigned>(digest[i]);
-  }
-#else // Boost >= 1.85 → unsigned int[5]
+    oss << std::setw(2) << static_cast<unsigned>(bytes[i]);
+#else
   unsigned int digest[5];
   sha1.get_digest(digest);
-
   // Format first 4 × 32-bit words → 32 hex chars
   for (int i = 0; i < 4; ++i)
-  {
     oss << std::setw(8) << digest[i];
-  }
 #endif
   return oss.str();
 }
