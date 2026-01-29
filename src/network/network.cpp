@@ -8,7 +8,8 @@
 #include <stdexcept>
 #include <sstream>
 #include <iomanip>
-#include <boost/version.hpp> // defines BOOST_VERSION as e.g. 109000 for 1.90.0
+#include <boost/uuid/uuid_generators.hpp> // defines boost::uuids::detail::sha1
+#include <boost/version.hpp>              // defines BOOST_VERSION as e.g. 109000 for 1.90.0
 
 // Data structures for Rtree
 #include <boost/geometry/index/rtree.hpp>
@@ -407,25 +408,23 @@ std::string Network::compute_hash() const
     sha1.process_bytes(&edge.length, sizeof(edge.length));
   }
 
-#if BOOST_VERSION >= 108500 // 1.85.0 = 108500; covers 1.85 → 1.90+
-  unsigned char digest[20];
-#else
-  unsigned int digest[5];
-#endif
-  sha1.get_digest(digest);
-
   // Format first 16 bytes (128 bits) as 32 hex chars
   std::ostringstream oss;
   oss << std::hex << std::setfill('0');
-#if BOOST_VERSION >= 108500
-  // New Boost: byte array → format byte-by-byte
+#if BOOST_VERSION < 108500 // Boost < 1.85.0 uses unsigned char[20]
+  unsigned char digest[20];
+  sha1.get_digest(digest);
+
+  // Format first 16 bytes → 32 hex chars
   for (int i = 0; i < 16; ++i)
   {
     oss << std::setw(2) << static_cast<unsigned>(digest[i]);
   }
-#else
-  // Old Boost: word array (big-endian words? but Boost writes in network byte order)
-  // Take first 4 words (128 bits)
+#else // Boost >= 1.85 → unsigned int[5]
+  unsigned int digest[5];
+  sha1.get_digest(digest);
+
+  // Format first 4 × 32-bit words → 32 hex chars
   for (int i = 0; i < 4; ++i)
   {
     oss << std::setw(8) << digest[i];
