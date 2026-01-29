@@ -3,7 +3,6 @@ requires = [
     "scikit-build-core>=0.8.0",
     "pybind11>=2.12.0",
     "setuptools-scm>=8.0",
-    "pybind11-stubgen>=2.5.0",
     "pytest>=8.0.0"
 ]
 build-backend = "scikit_build_core.build"
@@ -71,7 +70,7 @@ build-verbosity = 1
 
 [tool.cibuildwheel.windows]
 # Install Boost and build dependencies before building
-before-build = "(if not exist \"C:\\vcpkg\\archives\" mkdir \"C:\\vcpkg\\archives\") && vcpkg install boost-geometry:x64-windows boost-serialization:x64-windows boost-format:x64-windows boost-uuid:x64-windows && pip install scikit-build-core setuptools-scm pybind11 pybind11-stubgen delvewheel"
+before-build = "(if not exist \"C:\\vcpkg\\archives\" mkdir \"C:\\vcpkg\\archives\") && vcpkg install boost-geometry:x64-windows boost-serialization:x64-windows boost-format:x64-windows boost-uuid:x64-windows && pip install scikit-build-core setuptools-scm pybind11 delvewheel"
 
 # Set Boost paths and vcpkg toolchain for CMake
 environment = { BOOST_ROOT = "C:/vcpkg/installed/x64-windows", CMAKE_ARGS = "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake", VCPKG_FEATURE_FLAGS = "binarycaching", VCPKG_DEFAULT_BINARY_CACHE = "C:/vcpkg/archives" }
@@ -86,14 +85,14 @@ repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel} --add-path C:/vc
 
 [tool.cibuildwheel.linux]
 # Use manylinux_2_28 (AlmaLinux 8) instead of manylinux2014 (CentOS 7 EOL)
-before-build = "yum install -y boost-devel cmake && pip install pybind11-stubgen"
+before-build = "yum install -y boost-devel cmake && pip install"
 # Repair wheel to bundle external dependencies, exclude libfastmmlib.so which is already in the wheel
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} --exclude libfastmmlib.so"
 # Use newer manylinux image
 manylinux-x86_64-image = "manylinux_2_28"
 
 [tool.cibuildwheel.macos]
-before-build = "brew install boost cmake libomp && pip install pybind11-stubgen"
+before-build = "brew install boost cmake libomp && pip install"
 environment = { OpenMP_ROOT = "$(brew --prefix libomp)" }
 
 [tool.ruff]

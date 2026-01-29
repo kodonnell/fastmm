@@ -183,3 +183,13 @@ tp = min(expected_time, actual_time) / max(expected_time, actual_time)
 ```
 
 Similarly to above, this gives a higher priority when the travel time is the same, or faster than the expected travel time (which is the euclidean distance divided by the reference speed). If you're finding your routes are sticking to the nearest edge, regardless of the feasibility of the route, either decrease `gps_error` as above, or decrease (?) the reference speed.
+
+## Developing
+
+You can create stubs with
+
+```
+python .\generate_stubs_for_wheel.py .\python\fastmm\ .\python\fastmm\
+```
+
+For now, this is better than doing it in a CI/CD pipeline as Windows is painful.
