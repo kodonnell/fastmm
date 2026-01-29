@@ -85,14 +85,14 @@ repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel} --add-path C:/vc
 
 [tool.cibuildwheel.linux]
 # Use manylinux_2_28 (AlmaLinux 8) instead of manylinux2014 (CentOS 7 EOL)
-before-build = "yum install -y boost-devel cmake && pip install"
+before-build = "yum install -y boost-devel cmake"
 # Repair wheel to bundle external dependencies, exclude libfastmmlib.so which is already in the wheel
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} --exclude libfastmmlib.so"
 # Use newer manylinux image
 manylinux-x86_64-image = "manylinux_2_28"
 
 [tool.cibuildwheel.macos]
-before-build = "brew install boost cmake libomp && pip install"
+before-build = "brew install boost cmake libomp"
 environment = { OpenMP_ROOT = "$(brew --prefix libomp)" }
 
 [tool.ruff]
