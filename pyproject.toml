@@ -71,7 +71,7 @@ build-verbosity = 1
 
 [tool.cibuildwheel.windows]
 # Install Boost and build dependencies before building
-before-build = "(if not exist \"C:\\vcpkg\\archives\" mkdir \"C:\\vcpkg\\archives\") && vcpkg install boost-geometry:x64-windows boost-serialization:x64-windows boost-format:x64-windows && pip install scikit-build-core setuptools-scm pybind11 pybind11-stubgen delvewheel"
+before-build = "(if not exist \"C:\\vcpkg\\archives\" mkdir \"C:\\vcpkg\\archives\") && vcpkg install boost-geometry:x64-windows boost-serialization:x64-windows boost-format:x64-windows boost-uuid:x64-windows && pip install scikit-build-core setuptools-scm pybind11 pybind11-stubgen delvewheel"
 
 # Set Boost paths and vcpkg toolchain for CMake
 environment = { BOOST_ROOT = "C:/vcpkg/installed/x64-windows", CMAKE_ARGS = "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake", VCPKG_FEATURE_FLAGS = "binarycaching", VCPKG_DEFAULT_BINARY_CACHE = "C:/vcpkg/archives" }
