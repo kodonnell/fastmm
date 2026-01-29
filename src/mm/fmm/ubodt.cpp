@@ -18,54 +18,23 @@ using namespace FASTMM;
 using namespace FASTMM::CORE;
 using namespace FASTMM::NETWORK;
 using namespace FASTMM::MM;
-UBODT::UBODT(int buckets_arg, int multiplier_arg) : buckets(buckets_arg), multiplier(multiplier_arg)
+UBODT::UBODT(int num_vertices, double delta, const std::string &network_hash, TransitionMode mode)
+    : num_vertices(num_vertices), delta(delta), network_hash(network_hash), mode(mode)
 {
-  SPDLOG_TRACE("Intialization UBODT with buckets {} multiplier {}",
-               buckets, multiplier);
-  hashtable = (Record **)malloc(sizeof(Record *) * buckets);
-  for (int i = 0; i < buckets; i++)
-  {
-    hashtable[i] = nullptr;
-  }
+  SPDLOG_TRACE("Intialization UBODT with num_vertices={}, delta={}, hash={}, mode={}",
+               num_vertices, delta, network_hash, static_cast<int>(mode));
   SPDLOG_TRACE("Intialization UBODT finished");
 }
 
-UBODT::~UBODT()
+const Record *UBODT::look_up(NodeIndex source, NodeIndex target) const
 {
-  /* Clean hashtable */
-  SPDLOG_TRACE("Clean UBODT");
-  int i;
-  for (i = 0; i < buckets; ++i)
+  uint64_t hash = compute_hash(source, target);
+  auto it = table.find(hash);
+  if (it != table.end())
   {
-    Record *head = hashtable[i];
-    Record *curr;
-    while ((curr = head) != nullptr)
-    {
-      head = head->next;
-      free(curr);
-    }
+    return &it->second;
   }
-  // Destory hash table pointer
-  free(hashtable);
-  SPDLOG_TRACE("Clean UBODT finished");
-}
-
-Record *UBODT::look_up(NodeIndex source, NodeIndex target) const
-{
-  unsigned int h = cal_bucket_index(source, target);
-  Record *r = hashtable[h];
-  while (r != nullptr)
-  {
-    if (r->source == source && r->target == target)
-    {
-      return r;
-    }
-    else
-    {
-      r = r->next;
-    }
-  }
-  return r;
+  return nullptr;
 }
 
 std::vector<EdgeIndex> UBODT::look_sp_path(NodeIndex source,
@@ -76,18 +45,22 @@ std::vector<EdgeIndex> UBODT::look_sp_path(NodeIndex source,
   {
     return edges;
   }
-  Record *r = look_up(source, target);
+  const Record *r = look_up(source, target);
   // No transition exist from source to target
   if (r == nullptr)
-  {
-    return edges;
-  }
+    if (r == nullptr)
+    {
+      return edges;
+    }
   while (r->first_n != target)
   {
     edges.push_back(r->next_e);
     r = look_up(r->first_n, target);
+    if (!r)
+      break;
   }
-  edges.push_back(r->next_e);
+  if (r)
+    edges.push_back(r->next_e);
   return edges;
 }
 
@@ -112,8 +85,7 @@ CompletePath UBODT::construct_complete_path(int traj_id, const TGOpath &path,
     const Candidate *b = path[i + 1]->c;
 
     SPDLOG_DEBUG("Check point {} a {} b {}", i, a->edge->id, b->edge->id);
-    if ((a->edge->id != b->edge->id) || (a->offset - b->offset >
-                                         a->edge->length * reverse_tolerance))
+    if ((a->edge->id != b->edge->id) || (a->offset - b->offset > reverse_tolerance))
     {
       // segs stores edge index
       auto segs = look_sp_path(a->edge->target, b->edge->source);
@@ -122,7 +94,7 @@ CompletePath UBODT::construct_complete_path(int traj_id, const TGOpath &path,
       {
         SPDLOG_DEBUG("Edges not found connecting a b");
         SPDLOG_DEBUG("reverse movement {} tolerance {}",
-                     a->offset - b->offset, a->edge->length * reverse_tolerance);
+                     a->offset - b->offset, reverse_tolerance);
         SPDLOG_WARN("Traj {} unmatched as edge {} L {} offset {}"
                     " and edge {} L {} offset {} disconnected",
                     traj_id, a->edge->id, a->edge->length, a->offset,
@@ -163,110 +135,95 @@ double UBODT::get_delta() const
   return delta;
 }
 
-unsigned int UBODT::cal_bucket_index(NodeIndex source, NodeIndex target) const
+std::string UBODT::get_network_hash() const
 {
-  return (source * multiplier + target) % buckets;
+  return network_hash;
 }
 
-void UBODT::insert(Record *r)
+TransitionMode UBODT::get_mode() const
 {
-  // int h = (r->source*multiplier+r->target)%buckets ;
-  int h = cal_bucket_index(r->source, r->target);
-  r->next = hashtable[h];
-  hashtable[h] = r;
-  if (r->cost > delta)
-    delta = r->cost;
+  return mode;
+}
+
+int UBODT::get_num_vertices() const
+{
+  return num_vertices;
+}
+
+void UBODT::insert(const Record &r)
+{
+  uint64_t hash = compute_hash(r.source, r.target);
+  table[hash] = r;
   ++num_rows;
 }
 
-long UBODT::estimate_ubodt_rows(const std::string &filename)
+std::shared_ptr<UBODT> UBODT::read_ubodt(const std::string &filename, int progress_step)
 {
-  struct stat stat_buf;
-  long rc = stat(filename.c_str(), &stat_buf);
-  if (rc == 0)
-  {
-    int file_bytes = stat_buf.st_size;
-    SPDLOG_TRACE("UBODT file size is {} bytes", file_bytes);
-    std::string fn_extension = filename.substr(filename.find_last_of(".") + 1);
-    std::transform(fn_extension.begin(),
-                   fn_extension.end(),
-                   fn_extension.begin(),
-                   [](unsigned char c)
-                   { return std::tolower(c); });
-    int row_size = 28;
-    return file_bytes / row_size;
-  }
-  return -1;
-}
-
-int UBODT::find_prime_number(double value)
-{
-  std::vector<int> prime_numbers = {
-      5003, 10039, 20029, 50047, 100669, 200003, 500000,
-      1000039, 2000083, 5000101, 10000103, 20000033};
-  int N = prime_numbers.size();
-  for (int i = 0; i < N; ++i)
-  {
-    if (value <= prime_numbers[i])
-    {
-      return prime_numbers[i];
-    }
-  }
-  return prime_numbers[N - 1];
-}
-
-std::shared_ptr<UBODT> UBODT::read_ubodt_binary(const std::string &filename,
-                                                int multiplier)
-{
-  SPDLOG_INFO("Reading UBODT file (binary format) from {}", filename);
-  long rows = estimate_ubodt_rows(filename);
-  int progress_step = 100000;
-  SPDLOG_INFO("Estimated rows is {}", rows);
-  int buckets = find_prime_number(rows / LOAD_FACTOR);
-  SPDLOG_INFO("Number of buckets is {}", buckets);
-  std::shared_ptr<UBODT> table = std::make_shared<UBODT>(buckets, multiplier);
-  long NUM_ROWS = 0;
+  SPDLOG_INFO("Reading UBODT file from {}", filename);
   std::ifstream ifs(filename.c_str(), std::ios::binary);
-  // Check byte offset
-  std::streampos archiveOffset = ifs.tellg();
-  SPDLOG_INFO("Binary archive offset is {}", archiveOffset);
   std::streampos streamEnd = ifs.seekg(0, std::ios_base::end).tellg();
   SPDLOG_INFO("Binary file size is {} bytes", streamEnd);
-  ifs.seekg(archiveOffset);
+  ifs.seekg(0);
   boost::archive::binary_iarchive ia(ifs);
+
+  // Read metadata header
+  int version = 0;
+  int mode_int = 0;
+  double delta = 0;
+  int num_vertices = 0;
+  int stored_multiplier = 0;
+  std::string network_hash = "";
+
+  try
+  {
+    ia >> version >> mode_int >> delta >> num_vertices >> stored_multiplier >> network_hash;
+    SPDLOG_INFO("UBODT metadata: version={}, mode={}, delta={}, num_vertices={}, multiplier={}, hash={}",
+                version, mode_int, delta, num_vertices, stored_multiplier, network_hash);
+
+    if (version != 1)
+    {
+      throw std::runtime_error("Unsupported UBODT file version: " + std::to_string(version));
+    }
+  }
+  catch (const boost::archive::archive_exception &e)
+  {
+    // Old format file without metadata header
+    SPDLOG_WARN("Unsupported UBODT file version: {}.", version);
+    throw std::runtime_error("Unsupported UBODT file version: " + std::to_string(version));
+  }
+
+  // Create table with perfect hash
+  SPDLOG_INFO("Number of vertices for perfect hash is {}", num_vertices);
+
+  std::shared_ptr<UBODT> table = std::make_shared<UBODT>(num_vertices, delta, network_hash, static_cast<TransitionMode>(mode_int));
+
+  long long num_rows = 0;
   SPDLOG_INFO("Start reading UBODT");
   while (true)
   {
-    Record *r = (Record *)malloc(sizeof(Record));
+    Record r;
     try
     {
-      ia >> r->source;
-      ia >> r->target;
-      ia >> r->first_n;
-      ia >> r->prev_n;
-      ia >> r->next_e;
-      ia >> r->cost;
-      ++NUM_ROWS;
-      r->next = nullptr;
+      ia >> r.source;
+      ia >> r.target;
+      ia >> r.first_n;
+      ia >> r.prev_n;
+      ia >> r.next_e;
+      ia >> r.cost;
+      ++num_rows;
       table->insert(r);
-      if (NUM_ROWS % progress_step == 0)
+      if (progress_step > 0 && num_rows % progress_step == 0)
       {
-        SPDLOG_INFO("Read rows {}", NUM_ROWS);
+        SPDLOG_INFO("Read rows {}", num_rows);
       }
     }
     catch (...)
     {
-      free(r);
       break;
     }
   }
   ifs.close();
-  double lf = NUM_ROWS / (double)buckets;
-  SPDLOG_INFO("Estimated load factor #elements/#tablebuckets {}", lf);
-  if (lf > 10)
-  {
-    SPDLOG_WARN("Load factor is too large.");
-  }
-  SPDLOG_INFO("Finish reading UBODT with rows {}", NUM_ROWS);
+  SPDLOG_INFO("Finish reading UBODT with rows {}", num_rows);
+  SPDLOG_INFO("Perfect hash table size: {} entries", table->table.size());
   return table;
 }

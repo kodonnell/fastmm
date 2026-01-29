@@ -3,9 +3,6 @@
 # Import C++ bindings
 from .fastmm import *  # noqa: F401,F403
 
-# Import Python helpers
-from .matcher import MapMatcher
-
 try:
     from ._version import version as __version__
 except ImportError:
@@ -17,7 +14,6 @@ __all__ = [
     "Network",
     "NetworkGraph",
     "FastMapMatch",
-    "FastMapMatchConfig",
     "UBODT",
     "UBODTGenAlgorithm",
     "Trajectory",
@@ -25,12 +21,15 @@ __all__ = [
     "Point",
     "LineString",
     # Result classes
-    "PyMatchResult",
-    "PyMatchSegment",
-    "PyMatchCandidate",
-    "PyMatchPoint",
-    "PyMatchSegmentEdge",
+    "MatchSegment",
+    "MatchCandidate",
+    "MatchPoint",
+    "MatchSegmentEdge",
+    "SubTrajectory",
+    "SplitMatchResult",
     "MatchErrorCode",
+    # Enums
+    "TransitionMode",
     # Python helpers
     "MapMatcher",
 ]

@@ -14,6 +14,7 @@
 #include <list>
 #include <string>
 #include <unordered_map>
+#include <optional>
 #include "core/geometry.hpp"
 
 namespace FASTMM
@@ -50,12 +51,13 @@ namespace FASTMM
     {
       EdgeIndex index;               /**< Index of an edge, which is continuous [0,N-1] */
       EdgeID id;                     /**< Edge ID, can be discontinuous integers */
-      NodeIndex source;              /**< source node index */
-      NodeIndex target;              /**< target node index */
-      double length;                 /**< length of the edge polyline */
-      FASTMM::CORE::LineString geom; /**< the edge geometry */
+      NodeIndex source;              /**< Source node index */
+      NodeIndex target;              /**< Target node index */
+      double length;                 /**< Length of the edge polyline */
+      double speed;                  /**< Speed limit on the edge (-1 if unknown). Must be > 0. */
+      FASTMM::CORE::LineString geom; /**< The edge geometry */
     };
 
-  } // NETWORK
-} // MM
-#endif /* MM_TYPES_HPP */
+  }
+}
+#endif

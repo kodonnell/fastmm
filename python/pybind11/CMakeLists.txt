@@ -33,8 +33,8 @@ target_link_libraries(fastmm PRIVATE pybind11::pybind11 Python3::Module)
 set(FASTMM_LINK_LIBS FASTMMLIB)
 target_link_libraries(fastmm PRIVATE ${FASTMM_LINK_LIBS})
 
-# Use C++14
-set_target_properties(fastmm PROPERTIES CXX_STANDARD 14)
+# Use C++17 (pybind11 3.0+ requires C++17)
+set_target_properties(fastmm PROPERTIES CXX_STANDARD 17)
 
 # Set RPATH so the extension can find libfastmmlib.so in the same directory
 if(UNIX AND NOT APPLE)

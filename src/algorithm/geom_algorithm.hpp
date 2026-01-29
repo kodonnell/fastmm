@@ -199,11 +199,15 @@ namespace FASTMM
 
         /**
          * Cut a linestring at two offset values
+         * 
+         * If offset1 > offset2, the offsets are swapped and the geometry is reversed
+         * so the result always represents the segment from the lower to higher offset.
+         * 
          * @param linestring input line
          * @param offset1 starting offset, distance to the start point of linestring
          * @param offset2 ending offset, distance to the start point of linestring
-         * @return a linestring containing only the part covering starting offset to
-         * ending offset
+         * @return a linestring containing only the part from min(offset1,offset2) 
+         *         to max(offset1,offset2), with points ordered from lower to higher offset
          */
         FASTMM::CORE::LineString cutoffseg_unique(
             const FASTMM::CORE::LineString &linestring, double offset1, double offset2);

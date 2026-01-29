@@ -22,6 +22,15 @@ namespace FASTMM
   {
 
     /**
+     * Routing mode for map matching
+     */
+    enum class TransitionMode
+    {
+      SHORTEST, /**< Distance-based routing */
+      FASTEST   /**< Time-based routing */
+    };
+
+    /**
      * Error codes for map matching results
      */
     enum class MatchErrorCode : int
@@ -78,36 +87,38 @@ namespace FASTMM
      */
     struct MatchResult
     {
-      int id;                                       /**< id of the trajectory to be matched */
-      MatchedCandidatePath opt_candidate_path;      /**< A vector of candidate matched to each point of a trajectory. It is stored in order to export more detailed map matching information. */
-      OptimalPath optimal_path;                     /**< the optimal path, containing id of edges matched to each point in a trajectory */
-      CompletePath complete_path;                   /**< the complete path, containing ids of a sequence of topologically connected edges traversed by the trajectory.  */
-      std::vector<int> indices;                     /**< index of optimal_path edge in complete_path */
-      CORE::LineString matched_geometry;            /**< the geometry of the matched path */
-      MatchErrorCode error_code;                    /**< error code if the map matching failed */
-      int last_connected_trajectory_point;          /**< the index of the last connected layer */
-      std::vector<int> unmatched_candidate_indices; /**< the indices of the unmatched trajectory points if no candidates found */
+      int id;                                  /**< id of the trajectory to be matched */
+      MatchedCandidatePath opt_candidate_path; /**< A vector of candidate matched to each point of a trajectory. It is stored in order to export more detailed map matching information. */
+      OptimalPath optimal_path;                /**< the optimal path, containing id of edges matched to each point in a trajectory */
+      CompletePath complete_path;              /**< the complete path, containing ids of a sequence of topologically connected edges traversed by the trajectory.  */
+      std::vector<int> indices;                /**< index of optimal_path edge in complete_path */
+      CORE::LineString matched_geometry;       /**< the geometry of the matched path */
+      MatchErrorCode error_code;               /**< error code if the map matching failed */
     };
 
     struct PyMatchPoint
     {
-      double x;
-      double y;
-      double edge_offset;
-      double cumulative_distance;
+      double x;                   //**< x coordinate */
+      double y;                   //**< y coordinate */
+      double d;                   //**< Distance from previous point along the edge */
+      double t;                   //**< Infer the time at this point if possible. Speeds are used if available. -1 if unknown */
+      double speed;               //**< Speed at this point (from edge), if available, -1 if unknown */
+      double edge_offset;         //**< Offset from start of edge */
+      double cumulative_distance; //**< Cumulative distance along the matched path */
     };
 
     struct PyMatchSegmentEdge
     {
       long long edge_id;
       std::vector<PyMatchPoint> points;
+      bool reversed; // True if geometry is reversed (offset1 > offset2 on same edge)
     };
 
     struct PyMatchCandidate
     {
       double x;
       double y;
-      double t;
+      double t; //**< Timestamp or time value, -1 if unknown */
       double perpendicular_distance_to_matched_geometry;
       double offset_from_start_of_edge;
     };
@@ -119,19 +130,26 @@ namespace FASTMM
     };
 
     /**
-     * Py map matched result representation
+     * A continuous sub-trajectory match result (portion of trajectory that could be matched)
      */
-    struct PyMatchResult
+    struct PySubTrajectory
     {
-      int id;                                       /**< id of the trajectory to be matched */
-      MatchErrorCode error_code;                    /**< error code if the map matching failed */
-      int last_connected_trajectory_point;          /**< the index of the last connected layer */
-      std::vector<int> unmatched_candidate_indices; /**< the indices of the unmatched trajectory points if no candidates found */
-      std::vector<PyMatchSegment> segments;         /**< A vector of matched segments */
+      int start_index;                      /**< Starting trajectory point index (inclusive) */
+      int end_index;                        /**< Ending trajectory point index (inclusive) */
+      MatchErrorCode error_code;            /**< SUCCESS if matched, or reason for failure */
+      std::vector<PyMatchSegment> segments; /**< Matched segments (only populated if error_code == SUCCESS) */
     };
 
+    /**
+     * Result of matching with automatic trajectory splitting
+     */
+    struct PySplitMatchResult
+    {
+      int id;                                       /**< id of the trajectory */
+      std::vector<PySubTrajectory> subtrajectories; /**< List of sub-trajectory matches (both successful and failed) */
+    };
   };
 
 };
 
-#endif // FASTMM_INCLUDE_FASTMM_FASTMM_RESULT_HPP_
+#endif

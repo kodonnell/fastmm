@@ -55,7 +55,7 @@ namespace FASTMM
        *  Default constructor of Network (creates empty network)
        *
        *  Creates an empty network that can be populated using add_edge.
-       *  After adding all edges, call build_rtree_index() to build the spatial index.
+       *  After adding all edges, call finalize() to build the spatial index.
        */
       Network();
       /**
@@ -68,6 +68,7 @@ namespace FASTMM
        * @return number of edges
        */
       int get_edge_count() const;
+      bool is_finalized() const;
       const Edge &get_edge(EdgeID id) const;
       const Edge &get_edge(EdgeIndex index) const;
       /**
@@ -180,16 +181,31 @@ namespace FASTMM
        * @param source the source node ID
        * @param target the target node ID
        * @param geom the geometry of the edge as a LineString
+       * @param speed optional speed limit on the edge (for FASTEST mode)
        */
       void add_edge(EdgeID edge_id, NodeID source, NodeID target,
-                    const FASTMM::CORE::LineString &geom);
+                    const FASTMM::CORE::LineString &geom,
+                    std::optional<double> speed = std::nullopt);
       /**
        * Build rtree spatial index for the network
        *
        * This must be called after all edges have been added to the network
        * and before performing any spatial queries.
        */
-      void build_rtree_index();
+      void finalize();
+
+      /**
+       * Compute a hash of the network structure for cache validation
+       *
+       * @return 32-character hex hash string
+       */
+      std::string compute_hash() const;
+
+      /**
+       * Whether all edges have speed values
+       * @return true if all edges have speed, false if any edge lacks speed
+       */
+      bool all_edges_have_speed() const;
 
     private:
       /**
@@ -204,13 +220,15 @@ namespace FASTMM
                                       const FASTMM::CORE::LineString &segs,
                                       int offset = 0);
       Rtree rtree;             // Network rtree structure
+      bool finalized = false;  // Flag to prevent modifications after finalization
       std::vector<Edge> edges; // all edges in the network
       NodeIDVec node_id_vec;
       unsigned int num_vertices;
       NodeIndexMap node_map;
       EdgeIndexMap edge_map;
       std::vector<FASTMM::CORE::Point> vertex_points;
-    }; // Network
-  } // NETWORK
-} // FASTMM
-#endif /* FASTMM_NETWORK_HPP */
+      bool _all_edges_have_speed = true; // True if all edges have speed, false if any edge lacks speed
+    };
+  }
+}
+#endif

@@ -69,12 +69,21 @@ namespace FASTMM
       TransitionGraph(const TrajectoryCandidates &tc, double gps_error);
 
       /**
-       * Calculate transition probability
-       * @param  shortest_path_distance Shortest path distance between two candidates
+       * Calculate transition probability for SHORTEST mode (distance-based)
+       * @param  path_distance Shortest path distance between two candidates
        * @param  euclidean_distance Euclidean distance between two candidates
        * @return transition probability in HMM
        */
-      static double calculate_transition_probability(double shortest_path_distance, double euclidean_distance);
+      static double get_shortest_transition_probability(double path_distance, double euclidean_distance);
+
+      /**
+       * Calculate transition probability for FASTEST mode (time-based)
+       * @param  path_time Path travel time between two candidates
+       * @param  euclidean_distance Euclidean distance between two candidates
+       * @param  reference_speed Reference speed for calculating expected time
+       * @return transition probability in HMM
+       */
+      static double get_fastest_transition_probability(double path_time, double euclidean_distance, double reference_speed);
 
       /**
        * Calculate emission probability

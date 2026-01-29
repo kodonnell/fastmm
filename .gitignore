@@ -99,6 +99,7 @@ sync.sh
 
 
 cache
+.cache
 *.whl
 dist
 wheelhouse/
